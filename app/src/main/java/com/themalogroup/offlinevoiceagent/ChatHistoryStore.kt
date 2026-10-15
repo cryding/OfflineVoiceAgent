@@ -70,12 +70,7 @@ class ChatHistoryStore(private val preferences: SharedPreferences) {
             }
             append("\nCurrent user message: ").append(current)
             append("\nAssistant:")
-        }.take(MAX_PROMPT_CHARS)
-            .let { prompt ->
-                // Preserve the current question even if saved context was unusually large.
-                if (prompt.contains("Current user message:")) prompt
-                else "You are a helpful offline assistant. Answer honestly.\nCurrent user message: $current\nAssistant:"
-            }
+        }
     }
 
     companion object {
