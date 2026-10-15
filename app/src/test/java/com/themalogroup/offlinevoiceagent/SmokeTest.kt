@@ -12,6 +12,8 @@ class SmokeTest {
         assertEquals(AssistantCommand.OPEN_PHONE, CommandRouter.route("open dialer"))
         assertEquals(AssistantCommand.OPEN_ALARM, CommandRouter.route("set alarm"))
         assertEquals(AssistantCommand.READ_SCREEN, CommandRouter.route("read screen"))
+        assertEquals(AssistantCommand.SCREEN_TASK, CommandRouter.route("screen task search for science news"))
+        assertEquals(AssistantCommand.SCREEN_TASK, CommandRouter.route("স্ক্রিনে কাজ সার্চ করো"))
         assertEquals(AssistantCommand.TAP_SCREEN_LABEL, CommandRouter.route("tap Search"))
         assertEquals(AssistantCommand.SCROLL_DOWN, CommandRouter.route("scroll down"))
         assertEquals(AssistantCommand.TYPE_SCREEN_TEXT, CommandRouter.route("type hello"))
