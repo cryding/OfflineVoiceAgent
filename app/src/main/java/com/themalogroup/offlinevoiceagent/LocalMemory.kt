@@ -51,7 +51,7 @@ class LocalMemory(context: Context) {
         }
         if (legacy.isNotEmpty()) {
             val migrated = legacy.map { it.trim().take(MAX_NOTE_CHARS) }
-                .filter(String::isNotBlank).distinctBy { it.lowercase() }.takeLast(MAX_NOTES).reversed()
+                .filter { it.isNotBlank() }.distinctBy { it.lowercase() }.takeLast(MAX_NOTES).reversed()
             save(migrated)
             preferences.edit().remove(KEY_LEGACY_NOTES).apply()
             return migrated
