@@ -544,8 +544,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         val response = when (command) {
             AssistantCommand.ACCESSIBILITY_SETTINGS -> launchTool(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS), "Opening Accessibility settings. Enable Offline Voice Agent screen control there.")
             AssistantCommand.READ_SCREEN -> showScreenSnapshot()
-            AssistantCommand.SCROLL_DOWN -> screenAction { it.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_SCROLL_FORWARD) } ?: "Screen control is not enabled. Enable Accessibility first."
-            AssistantCommand.SCROLL_UP -> screenAction { it.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD) } ?: "Screen control is not enabled. Enable Accessibility first."
+            AssistantCommand.SCROLL_DOWN -> (AgentAccessibilityService.scroll(true) ?: false).let { if (it) "Scrolled down." else "Screen control is not enabled or no scrollable content is visible." }
+            AssistantCommand.SCROLL_UP -> (AgentAccessibilityService.scroll(false) ?: false).let { if (it) "Scrolled up." else "Screen control is not enabled or no scrollable content is visible." }
             AssistantCommand.TAP_SCREEN_LABEL -> {
                 val target = raw.substringAfter("tap ", raw.substringAfter("click ", raw.substringAfter("ট্যাপ করো ", ""))).trim()
                 AgentAccessibilityService.tapText(target) ?: "Screen control is not enabled. Enable Accessibility first."
