@@ -17,7 +17,10 @@ object ScreenTaskPlanner {
         "payment", "pay ", "pay now", "purchase", "buy ", "checkout", "bank", "upi",
         "transfer money", "send money", "password", "passcode", "pin code", "otp",
         "credit card", "debit card", "delete account", "factory reset", "uninstall",
-        "security settings", "change password", "পেমেন্ট", "টাকা পাঠাও", "টাকা দাও",
+        "security settings", "change password", "submit", "send ", "send message", "confirm",
+        "delete", "place order", "make call", "call now", "publish", "post ", "share ",
+        "transfer", "approve", "পেমেন্ট", "টাকা পাঠাও", "টাকা দাও", "বার্তা পাঠাও",
+        "কল করো", "নিশ্চিত করো", "মুছে ফেল", "পোস্ট করো", "শেয়ার করো",
         "কেনাকাটা", "পাসওয়ার্ড", "ওটিপি", "অ্যাকাউন্ট মুছে"
     )
 
