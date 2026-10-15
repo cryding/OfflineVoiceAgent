@@ -52,20 +52,22 @@ class ChatHistoryStore(private val preferences: SharedPreferences) {
 
     fun buildPrompt(userText: String, notes: List<String>): String {
         // Keep prompts bounded for small on-device context windows (e.g. Qwen ekv1280).
-        val recent = load().takeLast(2)
+        val recent = load().takeLast(CONTEXT_TURNS)
         val current = userText.trim().take(MAX_CURRENT_USER_CHARS)
         return buildString {
-            append("You are Maya, the user’s warm, friendly personal AI companion. Speak naturally like a trusted friend, not like a robotic help desk. ")\n            append("Prefer concise spoken-friendly replies in the user’s language (Bengali when they speak Bengali); ask a gentle follow-up when it genuinely helps. ")\n            append("Be proactive but never pretend you performed an action you did not perform. For phone actions, explain what you can open or ask for confirmation before consequential actions. ")\n            append("You are fully offline and have no internet access; do not claim to know live facts. ")
-            append("You have no internet access; do not claim to have checked live information. ")
+            append("You are Maya, the user's warm, friendly personal AI companion. Speak naturally like a trusted friend, not like a robotic help desk. ")
+            append("Prefer concise spoken-friendly replies in the user's language (Bengali when they speak Bengali); ask a gentle follow-up when it genuinely helps. ")
+            append("Be proactive but never pretend you performed an action you did not perform. For phone actions, explain what you can open or ask for confirmation before consequential actions. ")
+            append("You are an on-device assistant. Internet-dependent information may be unavailable; never claim to have checked live information unless a connected tool actually did so. ")
             if (notes.isNotEmpty()) {
                 append("\nUser-approved saved notes (use only when relevant):\n")
-                notes.take(3).forEach { append("- ").append(it.take(120)).append('\n') }
+                notes.take(MAX_NOTES).forEach { append("- ").append(it.take(MAX_NOTE_CHARS)).append('\n') }
             }
             if (recent.isNotEmpty()) {
                 append("\nRecent conversation for context (most recent turns only):\n")
                 recent.forEach { turn ->
-                    append("User: ").append(turn.user.take(180)).append('\n')
-                    append("Assistant: ").append(turn.assistant.take(220)).append('\n')
+                    append("User: ").append(turn.user.take(PROMPT_USER_CHARS)).append('\n')
+                    append("Assistant: ").append(turn.assistant.take(PROMPT_ASSISTANT_CHARS)).append('\n')
                 }
             }
             append("\nCurrent user message: ").append(current)
@@ -81,5 +83,8 @@ class ChatHistoryStore(private val preferences: SharedPreferences) {
         private const val MAX_CURRENT_USER_CHARS = 800
         private const val MAX_ASSISTANT_CHARS = 2000
         private const val MAX_NOTES = 10
+        private const val MAX_NOTE_CHARS = 120
+        private const val PROMPT_USER_CHARS = 180
+        private const val PROMPT_ASSISTANT_CHARS = 220
     }
 }
