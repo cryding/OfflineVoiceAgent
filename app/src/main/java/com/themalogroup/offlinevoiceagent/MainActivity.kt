@@ -39,6 +39,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private var wakeModeEnabled = false
     private var awaitingWakeCommand = false
     private var recognitionInProgress = false
+    @Volatile private var chatEpoch = 0L
     private val wakeHandler = Handler(Looper.getMainLooper())
     @Volatile private var llmEngine: LocalLlmEngine? = null
     private val requestAudio = 41
@@ -130,6 +131,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         val clearChatButton = Button(this).apply {
             text = "Clear local chat history"
             setOnClickListener {
+                chatEpoch += 1L
                 chatHistory.clear()
                 status.text = "Local conversation history cleared"
                 answer.text = "Previous AI conversation context has been deleted from this phone."
@@ -330,18 +332,26 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             if (engine != null) {
                 answer.text = "Thinking locally…"
                 status.text = "Generating response on device…"
+                val requestEpoch = chatEpoch
                 Thread {
                     try {
                         val prompt = chatHistory.buildPrompt(raw, memory.all())
                         val response = engine.generate(prompt).trim().ifBlank { "The local model returned an empty response. Try a shorter question." }
-                        chatHistory.append(raw, response)
+                        if (requestEpoch == chatEpoch) chatHistory.append(raw, response)
                         runOnUiThread {
-                            answer.text = response
-                            status.text = "Local model response ready"
-                            if (ttsReady) tts?.speak(response, TextToSpeech.QUEUE_FLUSH, null, "offline-agent-response")
+                            if (requestEpoch == chatEpoch) {
+                                answer.text = response
+                                status.text = "Local model response ready"
+                                if (ttsReady) tts?.speak(response, TextToSpeech.QUEUE_FLUSH, null, "offline-agent-response")
+                            }
                         }
                     } catch (e: Exception) {
-                        runOnUiThread { answer.text = "Local inference failed: ${e.localizedMessage ?: "unknown error"}"; status.text = "Model inference error" }
+                        runOnUiThread {
+                            if (requestEpoch == chatEpoch) {
+                                answer.text = "Local inference failed: ${e.localizedMessage ?: "unknown error"}"
+                                status.text = "Model inference error"
+                            }
+                        }
                     }
                 }.start()
                 return
