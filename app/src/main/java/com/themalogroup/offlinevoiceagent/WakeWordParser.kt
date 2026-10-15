@@ -14,9 +14,9 @@ object WakeWordParser {
         wakePattern.containsMatchIn(text) || bengaliPattern.containsMatchIn(text)
 
     fun commandAfterWake(text: String): String {
-        val english = wakePattern.replaceFirst(text, "").trim().trimStart(',', '.', '!', '?', ':', ';')
+        val english = wakePattern.replaceFirst(text, "").trim().trimStart(',', '.', '!', '?', ':', ';').trim()
         if (english != text) return english
-        return bengaliPattern.replaceFirst(text, "").trim().trimStart(',', '.', '!', '?', ':', ';')
+        return bengaliPattern.replaceFirst(text, "").trim().trimStart(',', '.', '!', '?', ':', ';').trim()
     }
 
     fun normalizeForDisplay(text: String): String = text.lowercase(Locale.ROOT).trim()
