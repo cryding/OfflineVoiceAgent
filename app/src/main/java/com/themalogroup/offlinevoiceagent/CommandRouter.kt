@@ -5,7 +5,7 @@ import java.util.Locale
 enum class AssistantCommand {
     TIME, DATE, HELLO, OPEN_SETTINGS, OPEN_CONTACTS, OPEN_CALENDAR, PICK_FILE,
     OPEN_CAMERA, OPEN_BROWSER, OPEN_MAPS, OPEN_YOUTUBE, SEARCH_YOUTUBE, OPEN_PHONE, OPEN_ALARM,
-    OPEN_WIFI_SETTINGS, OPEN_BLUETOOTH_SETTINGS, WEB_SEARCH,
+    OPEN_WIFI_SETTINGS, OPEN_BLUETOOTH_SETTINGS, WEB_SEARCH, ACCESSIBILITY_SETTINGS, READ_SCREEN, TAP_SCREEN_LABEL, SCROLL_DOWN, SCROLL_UP, TYPE_SCREEN_TEXT,
     REMEMBER, RECALL, LIST_MEMORY, CLEAR_MEMORY, CONFIRM_CLEAR, STOP_SPEAKING, HELP, UNKNOWN
 }
 
@@ -34,6 +34,12 @@ object CommandRouter {
                 AssistantCommand.STOP_SPEAKING
             command == "help" || command == "what can you do" || command == "সাহায্য" ->
                 AssistantCommand.HELP
+            command in setOf("accessibility settings", "open accessibility settings", "screen control settings", "অ্যাক্সেসিবিলিটি সেটিংস") -> AssistantCommand.ACCESSIBILITY_SETTINGS
+            command in setOf("read screen", "read this screen", "what is on my screen", "screen reader", "স্ক্রিন পড়ো", "স্ক্রিনে কী আছে") -> AssistantCommand.READ_SCREEN
+            command in setOf("scroll down", "swipe down", "নিচে স্ক্রল করো", "নিচে যাও") -> AssistantCommand.SCROLL_DOWN
+            command in setOf("scroll up", "swipe up", "উপরে স্ক্রল করো", "উপরে যাও") -> AssistantCommand.SCROLL_UP
+            command.startsWith("tap ") || command.startsWith("click ") || command.startsWith("ট্যাপ করো ") -> AssistantCommand.TAP_SCREEN_LABEL
+            command.startsWith("type ") || command.startsWith("টাইপ করো ") -> AssistantCommand.TYPE_SCREEN_TEXT
             command in setOf("settings", "open settings", "phone settings", "সেটিংস খোলো") -> AssistantCommand.OPEN_SETTINGS
             command in setOf("contacts", "open contacts", "contact list", "my contacts", "কন্টাক্ট খোলো") ->
                 AssistantCommand.OPEN_CONTACTS
