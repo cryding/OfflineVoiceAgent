@@ -341,7 +341,14 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 initializeModel(copied.absolutePath, generation)
             } catch (e: Exception) {
                 copied?.delete()
-                runOnUiThread { status.text = "Model import failed: ${e.localizedMessage ?: "unsupported model"}" }
+                runOnUiThread {
+                    val stillCurrent = synchronized(modelLock) {
+                        !activityDestroyed && generation == modelRequestGeneration
+                    }
+                    if (stillCurrent) {
+                        status.text = "Model import failed: ${e.localizedMessage ?: "unsupported model"}"
+                    }
+                }
             }
         }.start()
     }
