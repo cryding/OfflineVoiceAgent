@@ -49,7 +49,7 @@ class SmokeTest {
     @Test fun rejectsAmbiguousPhoneActionPhrases() {
         assertEquals(AssistantCommand.UNKNOWN, CommandRouter.route("maybe open settings later"))
         assertEquals(AssistantCommand.UNKNOWN, CommandRouter.route("my calendar is busy"))
-        assertEquals(AssistantCommand.UNKNOWN, CommandRouter.route("I like the word time"))
+        assertEquals(AssistantCommand.UNKNOWN, CommandRouter.route("I like timeless music"))
     }
 
     @Test fun routesLocalMemoryCommands() {
