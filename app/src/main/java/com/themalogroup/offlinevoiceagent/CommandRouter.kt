@@ -5,7 +5,7 @@ import java.util.Locale
 enum class AssistantCommand {
     TIME, DATE, HELLO, OPEN_SETTINGS, OPEN_CONTACTS, OPEN_CALENDAR, PICK_FILE,
     OPEN_CAMERA, OPEN_BROWSER, OPEN_MAPS, OPEN_YOUTUBE, SEARCH_YOUTUBE, OPEN_PHONE, OPEN_ALARM,
-    OPEN_WIFI_SETTINGS, OPEN_BLUETOOTH_SETTINGS, WEB_SEARCH, ACCESSIBILITY_SETTINGS, READ_SCREEN, TAP_SCREEN_LABEL, SCROLL_DOWN, SCROLL_UP, TYPE_SCREEN_TEXT,
+    OPEN_WIFI_SETTINGS, OPEN_BLUETOOTH_SETTINGS, WEB_SEARCH, ACCESSIBILITY_SETTINGS, READ_SCREEN, TAP_SCREEN_LABEL, SCROLL_DOWN, SCROLL_UP, TYPE_SCREEN_TEXT, TAP_AT, SWIPE, PRESS_BACK, PRESS_HOME, PRESS_ENTER,
     REMEMBER, RECALL, LIST_MEMORY, CLEAR_MEMORY, CONFIRM_CLEAR, STOP_SPEAKING, HELP, UNKNOWN
 }
 
@@ -34,6 +34,11 @@ object CommandRouter {
                 AssistantCommand.STOP_SPEAKING
             command == "help" || command == "what can you do" || command == "সাহায্য" ->
                 AssistantCommand.HELP
+            command in setOf("press back", "go back", "পিছনে যাও") -> AssistantCommand.PRESS_BACK
+            command in setOf("press home", "go home", "হোমে যাও") -> AssistantCommand.PRESS_HOME
+            command in setOf("press enter", "press search", "submit search", "সার্চ করো") -> AssistantCommand.PRESS_ENTER
+            command.matches(Regex("""tap at\\s+\\d+\\s*,\\s*\\d+""")) -> AssistantCommand.TAP_AT
+            command.matches(Regex("""swipe from\\s+\\d+\\s*,\\s*\\d+\\s+to\\s+\\d+\\s*,\\s*\\d+""")) -> AssistantCommand.SWIPE
             command in setOf("accessibility settings", "open accessibility settings", "screen control settings", "অ্যাক্সেসিবিলিটি সেটিংস") -> AssistantCommand.ACCESSIBILITY_SETTINGS
             command in setOf("read screen", "read this screen", "what is on my screen", "screen reader", "স্ক্রিন পড়ো", "স্ক্রিনে কী আছে") -> AssistantCommand.READ_SCREEN
             command in setOf("scroll down", "swipe down", "নিচে স্ক্রল করো", "নিচে যাও") -> AssistantCommand.SCROLL_DOWN
