@@ -79,7 +79,6 @@ class ChatHistoryStore(private val preferences: SharedPreferences) {
         private const val CONTEXT_TURNS = 6
         private const val MAX_USER_CHARS = 1000
         private const val MAX_CURRENT_USER_CHARS = 800
-        private const val MAX_PROMPT_CHARS = 2600
         private const val MAX_ASSISTANT_CHARS = 2000
         private const val MAX_NOTES = 10
     }
