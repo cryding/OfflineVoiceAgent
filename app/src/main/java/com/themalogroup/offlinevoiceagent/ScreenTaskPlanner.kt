@@ -27,15 +27,11 @@ object ScreenTaskPlanner {
     }
 
     fun buildPrompt(goal: String, screen: String): String {
-        return "You are a cautious Android UI assistant. Plan a small task using only the visible screen tree.\\n" +
-            "User goal: " + goal.take(300) + "\\nCurrent screen tree:\\n" + screen.take(7000) + "\\n\\n" +
-            "Return ONLY a JSON array with at most " + MAX_STEPS + " objects. Allowed actions: " +
-            "{\\"action\\":\\"tap\\",\\"value\\":\\"exact visible label\\"}; " +
-            "{\\"action\\":\\"type\\",\\"value\\":\\"ordinary non-sensitive text\\"}; " +
-            "{\\"action\\":\\"scroll_down\\",\\"value\\":\\"\\"}; " +
-            "{\\"action\\":\\"scroll_up\\",\\"value\\":\\"\\"}; " +
-            "{\\"action\\":\\"back\\",\\"value\\":\\"\\"}; " +
-            "{\\"action\\":\\"read\\",\\"value\\":\\"\\"}.\\n" +
+        val schema = """[{"action":"tap","value":"exact visible label"}]"""
+        return "You are a cautious Android UI assistant. Plan a small task using only the visible screen tree.\n" +
+            "User goal: " + goal.take(300) + "\nCurrent screen tree:\n" + screen.take(7000) + "\n\n" +
+            "Return ONLY a JSON array with at most " + MAX_STEPS + " objects. Example: " + schema + "\n" +
+            "Allowed actions are tap, type, scroll_down, scroll_up, back, read. Use empty value for actions other than tap/type.\n" +
             "Use only labels present in the screen tree. Do not invent controls. Never automate payment, purchase, banking, credentials, account/security, destructive or privacy-sensitive flows. " +
             "Never type passwords, PINs, OTPs, personal identifiers, payment data, or secrets. Never submit a form, send a message, make a call, purchase, delete, or confirm an irreversible action. " +
             "If the screen does not support the goal, return []. No markdown, commentary, URLs, coordinates, or extra keys."
