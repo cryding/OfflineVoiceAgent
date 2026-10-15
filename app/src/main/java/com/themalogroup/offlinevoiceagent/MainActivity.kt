@@ -1,6 +1,7 @@
 package com.themalogroup.offlinevoiceagent
 
 import android.Manifest
+import android.provider.ContactsContract
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -37,6 +38,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private var tts: TextToSpeech? = null
     private var ttsReady = false
     private var clearPending = false
+    private var pendingContactQuery: String? = null
     private var wakeModeEnabled = false
     private var awaitingWakeCommand = false
     private var recognitionInProgress = false
@@ -44,6 +46,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private val wakeHandler = Handler(Looper.getMainLooper())
     @Volatile private var llmEngine: LocalLlmEngine? = null
     private val requestAudio = 41
+    private val requestContacts = 44
     private val requestFile = 42
     private val requestModel = 43
     private val MAX_MODEL_BYTES = 6L * 1024L * 1024L * 1024L
@@ -387,6 +390,15 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             AssistantCommand.HELLO -> "Hello! I can answer time and date questions, open phone tools, and remember notes locally."
             AssistantCommand.OPEN_SETTINGS -> launchTool(Intent(android.provider.Settings.ACTION_SETTINGS), "Opening Android Settings.")
             AssistantCommand.OPEN_CONTACTS -> launchTool(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CONTACTS), "Opening Contacts.")
+            AssistantCommand.FIND_CONTACT -> {
+                val query = CommandRouter.contactQuery(raw)
+                if (query.isBlank()) "Tell me the contact name to search for."
+                else if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+                    pendingContactQuery = query
+                    ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_CONTACTS), requestContacts)
+                    "Contacts permission is needed to search your saved contacts."
+                } else searchContacts(query)
+            }
             AssistantCommand.OPEN_CALENDAR -> launchTool(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALENDAR), "Opening Calendar.")
             AssistantCommand.PICK_FILE -> {
                 try {
@@ -423,6 +435,35 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         status.text = if (command == AssistantCommand.UNKNOWN) "No matching local command" else "Command complete"
         if (ttsReady && command != AssistantCommand.STOP_SPEAKING) {
             tts?.speak(response, TextToSpeech.QUEUE_FLUSH, null, "offline-agent-response")
+        }
+    }
+
+    private fun searchContacts(query: String): String {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            return "Contacts permission was not granted."
+        }
+        val matches = mutableListOf<String>()
+        val projection = arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME, ContactsContract.CommonDataKinds.Phone.NUMBER)
+        return try {
+            contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                projection,
+                "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} LIKE ?",
+                arrayOf("%${query.replace("%", "\\%").replace("_", "\\_")}%"),
+                "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} ASC"
+            )?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+                val numberIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+                while (cursor.moveToNext() && matches.size < 5) {
+                    val name = if (nameIndex >= 0) cursor.getString(nameIndex).orEmpty() else ""
+                    val number = if (numberIndex >= 0) cursor.getString(numberIndex).orEmpty() else ""
+                    if (name.isNotBlank() && number.isNotBlank()) matches.add("$name: $number")
+                }
+            }
+            if (matches.isEmpty()) "No saved contact matched \"$query\"."
+            else "Matching contacts (up to 5): " + matches.joinToString("; ")
+        } catch (e: Exception) {
+            "Could not search contacts: ${e.localizedMessage ?: "unknown error"}"
         }
     }
 
@@ -504,6 +545,16 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == requestAudio && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) beginListening()
         else if (requestCode == requestAudio) status.text = "Microphone permission is required for voice input."
+        else if (requestCode == requestContacts) {
+            val query = pendingContactQuery
+            pendingContactQuery = null
+            if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED && !query.isNullOrBlank()) {
+                val response = searchContacts(query)
+                answer.text = response
+                status.text = "Contact search complete"
+                if (ttsReady) tts?.speak(response, TextToSpeech.QUEUE_FLUSH, null, "contact-search")
+            } else status.text = "Contacts permission was not granted."
+        }
     }
 
     override fun onPause() {
