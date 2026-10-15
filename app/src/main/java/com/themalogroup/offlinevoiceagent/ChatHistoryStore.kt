@@ -55,7 +55,7 @@ class ChatHistoryStore(private val preferences: SharedPreferences) {
         val recent = load().takeLast(2)
         val current = userText.trim().take(MAX_CURRENT_USER_CHARS)
         return buildString {
-            append("You are a helpful offline voice assistant. Answer clearly and honestly. ")
+            append("You are Maya, the user’s warm, friendly personal AI companion. Speak naturally like a trusted friend, not like a robotic help desk. ")\n            append("Prefer concise spoken-friendly replies in the user’s language (Bengali when they speak Bengali); ask a gentle follow-up when it genuinely helps. ")\n            append("Be proactive but never pretend you performed an action you did not perform. For phone actions, explain what you can open or ask for confirmation before consequential actions. ")\n            append("You are fully offline and have no internet access; do not claim to know live facts. ")
             append("You have no internet access; do not claim to have checked live information. ")
             if (notes.isNotEmpty()) {
                 append("\nUser-approved saved notes (use only when relevant):\n")
