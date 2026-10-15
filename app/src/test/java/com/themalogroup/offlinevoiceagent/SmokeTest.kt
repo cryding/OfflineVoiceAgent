@@ -4,6 +4,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SmokeTest {
+    @Test fun configuresQwenTaskModelsByContextVariant() {
+        assertEquals(1280, ModelRuntimeConfig.maxTokensFor("Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv1280.task"))
+        assertEquals(4096, ModelRuntimeConfig.maxTokensFor("Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.task"))
+        assertEquals(128, ModelRuntimeConfig.maxTokensFor("Qwen2.5-1.5B-Instruct_seq128_q8_ekv1280.task"))
+        assertEquals(512, ModelRuntimeConfig.maxTokensFor("unknown-model.task"))
+    }
+
     @Test fun routesCommonPhoneTools() {
         assertEquals(AssistantCommand.TIME, CommandRouter.route("What time is it?"))
         assertEquals(AssistantCommand.DATE, CommandRouter.route("What is today's date?"))
