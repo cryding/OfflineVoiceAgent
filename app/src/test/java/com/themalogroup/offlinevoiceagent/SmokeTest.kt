@@ -4,6 +4,19 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class SmokeTest {
+    @Test fun routesMayaToolCommandsWithoutSubstringFalsePositives() {
+        assertEquals(AssistantCommand.OPEN_CAMERA, CommandRouter.route("open camera"))
+        assertEquals(AssistantCommand.OPEN_BROWSER, CommandRouter.route("open browser"))
+        assertEquals(AssistantCommand.OPEN_MAPS, CommandRouter.route("open maps"))
+        assertEquals(AssistantCommand.OPEN_YOUTUBE, CommandRouter.route("open youtube"))
+        assertEquals(AssistantCommand.OPEN_PHONE, CommandRouter.route("open dialer"))
+        assertEquals(AssistantCommand.OPEN_ALARM, CommandRouter.route("set alarm"))
+        assertEquals(AssistantCommand.OPEN_WIFI_SETTINGS, CommandRouter.route("open wifi settings"))
+        assertEquals(AssistantCommand.OPEN_BLUETOOTH_SETTINGS, CommandRouter.route("open bluetooth settings"))
+        assertEquals(AssistantCommand.WEB_SEARCH, CommandRouter.route("search web for weather"))
+        assertEquals(AssistantCommand.UNKNOWN, CommandRouter.route("I watched a camera documentary"))
+    }
+
     @Test fun configuresQwenTaskModelsByContextVariant() {
         assertEquals(1280, ModelRuntimeConfig.maxTokensFor("Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv1280.task"))
         assertEquals(4096, ModelRuntimeConfig.maxTokensFor("Qwen2.5-1.5B-Instruct_multi-prefill-seq_q8_ekv4096.task"))
