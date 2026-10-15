@@ -577,8 +577,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 } else "No memory deletion is pending. Say forget all memories first if you want to delete them."
             }
             AssistantCommand.STOP_SPEAKING -> { tts?.stop(); "Speech stopped." }
-            AssistantCommand.HELP -> "Try time/date, open settings, open contacts, open calendar, choose file, remember a note, or ask a question with a compatible local model loaded."
-            AssistantCommand.UNKNOWN -> "No local model is loaded. Import a compatible MediaPipe .task model to enable on-device AI responses."
+            AssistantCommand.HELP -> "I’m Maya, your offline companion. Try time/date, open camera/browser/maps/YouTube/dialer, open Wi-Fi or Bluetooth settings, set alarm, search web for a phrase, open contacts/calendar, choose file, or ask me to remember a note. Some actions open an app and may need your confirmation."
+            AssistantCommand.UNKNOWN -> if (llmEngine == null) "I can do phone actions offline, but for open-ended conversation please import a compatible local .task AI model." else "I’m here with you. Ask me naturally, or say “help” to hear the tools I can open."
         }
         answer.text = response
         status.text = if (command == AssistantCommand.UNKNOWN) "No matching local command" else "Command complete"
