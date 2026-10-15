@@ -370,21 +370,22 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private fun initializeModel(path: String, generation: Long) {
         var candidate: LocalLlmEngine? = null
         try {
-            candidate = LocalLlmEngine(this, path)
+            val next = LocalLlmEngine(this, path)
+            candidate = next
             val oldPath = prefs.getString("model_path", null)
             val accepted = synchronized(modelLock) {
                 if (activityDestroyed || generation != modelRequestGeneration) {
                     false
                 } else {
                     val old = llmEngine
-                    llmEngine = candidate
+                    llmEngine = next
                     try { old?.close() } catch (_: Exception) {}
                     prefs.edit().putString("model_path", path).apply()
                     true
                 }
             }
             if (!accepted) {
-                try { candidate.close() } catch (_: Exception) {}
+                try { next.close() } catch (_: Exception) {}
                 if (prefs.getString("model_path", null) != path) File(path).delete()
                 return
             }
