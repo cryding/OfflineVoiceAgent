@@ -26,14 +26,17 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private lateinit var status: TextView
     private lateinit var transcript: TextView
     private lateinit var answer: TextView
+    private lateinit var memory: LocalMemory
     private var speechRecognizer: SpeechRecognizer? = null
     private var tts: TextToSpeech? = null
     private var ttsReady = false
+    private var clearPending = false
     private val requestAudio = 41
     private val requestFile = 42
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        memory = LocalMemory(this)
         tts = TextToSpeech(this, this)
         buildUi()
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
@@ -76,7 +79,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             setTextColor(0xFF171411.toInt())
         }
         status = TextView(this).apply {
-            text = "Ready · Basic commands run on-device"; textSize = 15f
+            text = "Ready · Local memory enabled"; textSize = 15f
             gravity = Gravity.CENTER; setPadding(0, 14, 0, 20)
         }
         val mic = Button(this).apply {
@@ -88,7 +91,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             setPadding(16, 18, 16, 18); setBackgroundColor(0xFFFFE9DC.toInt())
         }
         answer = TextView(this).apply {
-            text = "Try: time, date, open settings, open contacts, open calendar, or choose file."
+            text = "Try: time, date, open settings, or “remember that I prefer Bengali”."
             textSize = 17f; setTextColor(0xFF4B4038.toInt()); setPadding(16, 18, 16, 18)
         }
         val input = EditText(this).apply { hint = "Or type a command…"; textSize = 16f }
@@ -100,6 +103,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             }
         }
         listOf(title, status, mic, label("YOU SAID"), transcript, label("ASSISTANT"), answer, input, run,
+            label("Memory stays on this device. Say “list memories” or “forget all memories” to manage it."),
             label("Offline speech depends on your installed Android speech service and language pack.")).forEach {
             content.addView(it, matchWrap())
         }
@@ -133,10 +137,11 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
 
     private fun handleCommand(raw: String) {
-        val response = when (CommandRouter.route(raw)) {
+        val command = CommandRouter.route(raw)
+        val response = when (command) {
             AssistantCommand.TIME -> "The time is " + SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date())
             AssistantCommand.DATE -> "Today is " + SimpleDateFormat("EEEE, d MMMM yyyy", Locale.getDefault()).format(Date())
-            AssistantCommand.HELLO -> "Hello! I can answer time and date questions and open selected phone tools."
+            AssistantCommand.HELLO -> "Hello! I can answer time and date questions, open phone tools, and remember notes locally."
             AssistantCommand.OPEN_SETTINGS -> launchTool(Intent(android.provider.Settings.ACTION_SETTINGS), "Opening Android Settings.")
             AssistantCommand.OPEN_CONTACTS -> launchTool(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CONTACTS), "Opening Contacts.")
             AssistantCommand.OPEN_CALENDAR -> launchTool(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALENDAR), "Opening Calendar.")
@@ -148,12 +153,31 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     "Choose a file in Android's system file picker."
                 } catch (_: Exception) { "No compatible file picker was found." }
             }
+            AssistantCommand.REMEMBER -> {
+                val note = CommandRouter.memoryText(raw)
+                if (memory.add(note)) "I saved this note on your phone: $note" else "Tell me what you want me to remember."
+            }
+            AssistantCommand.RECALL, AssistantCommand.LIST_MEMORY -> {
+                val notes = memory.all()
+                if (notes.isEmpty()) "I don't have any saved notes yet."
+                else "Here are your saved notes: " + notes.joinToString("; ")
+            }
+            AssistantCommand.CLEAR_MEMORY -> {
+                clearPending = true
+                "This will delete all saved notes on this phone. To confirm, type: confirm clear memory."
+            }
+            AssistantCommand.CONFIRM_CLEAR -> {
+                if (clearPending) {
+                    memory.clear(); clearPending = false
+                    "All saved notes have been deleted from this device."
+                } else "No memory deletion is pending. Say forget all memories first if you want to delete them."
+            }
             AssistantCommand.STOP_SPEAKING -> { tts?.stop(); "Speech stopped." }
-            AssistantCommand.HELP -> "Try: what time is it, today's date, open settings, open contacts, open calendar, choose file, or stop speaking."
-            AssistantCommand.UNKNOWN -> "I don't have a safe built-in action for that yet. Try Help. Local LLM reasoning is not integrated yet."
+            AssistantCommand.HELP -> "Try: what time is it, today's date, open settings, open contacts, open calendar, choose file, remember that I prefer Bengali, list memories, or forget all memories."
+            AssistantCommand.UNKNOWN -> "I don't have a safe built-in action for that yet. Try Help. A local LLM is not integrated yet."
         }
         answer.text = response
-        if (ttsReady && CommandRouter.route(raw) != AssistantCommand.STOP_SPEAKING) {
+        if (ttsReady && command != AssistantCommand.STOP_SPEAKING) {
             tts?.speak(response, TextToSpeech.QUEUE_FLUSH, null, "offline-agent-response")
         }
     }
