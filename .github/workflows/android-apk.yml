@@ -22,7 +22,10 @@ jobs:
       - name: Set up stable Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+          packages: |
+            platform-tools
+            platforms;android-35
+            build-tools;35.0.0
       - name: Run unit tests
         run: gradle testDebugUnitTest
       - name: Build debug APK
