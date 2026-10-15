@@ -432,6 +432,14 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         setContentView(root)
     }
 
+    private fun showScreenSnapshot(): String {
+        val snapshot = AgentAccessibilityService.readActiveScreen()
+        val message = snapshot ?: "Screen control is not enabled. Tap Enable screen control, enable the service in Android Accessibility settings, then try again."
+        answer.text = message
+        status.text = if (snapshot == null) "Accessibility service unavailable" else "Current screen read locally"
+        return message
+    }
+
     private fun label(value: String) = TextView(this).apply {
         text = value; textSize = 12f; setTextColor(0xFFB65332.toInt()); setPadding(0, 18, 0, 8)
     }
