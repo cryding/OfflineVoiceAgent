@@ -30,6 +30,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private var tts: TextToSpeech? = null
     private var ttsReady = false
     private val requestAudio = 41
+    private val requestFile = 42
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -87,7 +88,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             setPadding(16, 18, 16, 18); setBackgroundColor(0xFFFFE9DC.toInt())
         }
         answer = TextView(this).apply {
-            text = "Try: What time is it? · What is today's date? · Open settings."
+            text = "Try: time, date, open settings, open contacts, open calendar, or choose file."
             textSize = 17f; setTextColor(0xFF4B4038.toInt()); setPadding(16, 18, 16, 18)
         }
         val input = EditText(this).apply { hint = "Or type a command…"; textSize = 16f }
@@ -132,34 +133,54 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
 
     private fun handleCommand(raw: String) {
-        val command = raw.lowercase(Locale.ROOT).trim()
-        val response = when {
-            command.contains("time") || command.contains("সময়") || command.contains("সময়") ->
-                "The time is " + SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date())
-            command.contains("date") || command.contains("তারিখ") ->
-                "Today is " + SimpleDateFormat("EEEE, d MMMM yyyy", Locale.getDefault()).format(Date())
-            command.contains("hello") || command.contains("হ্যালো") ->
-                "Hello! I can tell you the time or date, and open Android Settings."
-            command.contains("open settings") || command.contains("settings") || command.contains("সেটিংস") -> {
-                try { startActivity(Intent(android.provider.Settings.ACTION_SETTINGS)); "Opening Android Settings." }
-                catch (_: Exception) { "I could not open Settings." }
+        val response = when (CommandRouter.route(raw)) {
+            AssistantCommand.TIME -> "The time is " + SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date())
+            AssistantCommand.DATE -> "Today is " + SimpleDateFormat("EEEE, d MMMM yyyy", Locale.getDefault()).format(Date())
+            AssistantCommand.HELLO -> "Hello! I can answer time and date questions and open selected phone tools."
+            AssistantCommand.OPEN_SETTINGS -> launchTool(Intent(android.provider.Settings.ACTION_SETTINGS), "Opening Android Settings.")
+            AssistantCommand.OPEN_CONTACTS -> launchTool(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CONTACTS), "Opening Contacts.")
+            AssistantCommand.OPEN_CALENDAR -> launchTool(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_CALENDAR), "Opening Calendar.")
+            AssistantCommand.PICK_FILE -> {
+                try {
+                    startActivityForResult(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE); type = "*/*"
+                    }, requestFile)
+                    "Choose a file in Android's system file picker."
+                } catch (_: Exception) { "No compatible file picker was found." }
             }
-            command.contains("stop speaking") -> { tts?.stop(); "Speech stopped." }
-            else -> "This first build supports basic time/date questions and opening Settings. Local LLM integration is not added yet."
+            AssistantCommand.STOP_SPEAKING -> { tts?.stop(); "Speech stopped." }
+            AssistantCommand.HELP -> "Try: what time is it, today's date, open settings, open contacts, open calendar, choose file, or stop speaking."
+            AssistantCommand.UNKNOWN -> "I don't have a safe built-in action for that yet. Try Help. Local LLM reasoning is not integrated yet."
         }
         answer.text = response
-        if (ttsReady) tts?.speak(response, TextToSpeech.QUEUE_FLUSH, null, "offline-agent-response")
+        if (ttsReady && CommandRouter.route(raw) != AssistantCommand.STOP_SPEAKING) {
+            tts?.speak(response, TextToSpeech.QUEUE_FLUSH, null, "offline-agent-response")
+        }
+    }
+
+    private fun launchTool(intent: Intent, successMessage: String): String {
+        return try {
+            if (intent.resolveActivity(packageManager) == null) "No compatible app is installed for this action."
+            else { startActivity(intent); successMessage }
+        } catch (_: Exception) { "Android could not open that app." }
     }
 
     override fun onInit(code: Int) {
         ttsReady = code == TextToSpeech.SUCCESS
-        if (ttsReady) tts?.language = Locale.getDefault()
+        if (ttsReady) {
+            val result = tts?.setLanguage(Locale.getDefault())
+            status.text = if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED)
+                "Ready · Install a supported TTS voice for speech output."
+            else "Ready · TTS engine available; offline voice depends on installed voice data."
+        }
     }
+
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == requestAudio && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) beginListening()
         else if (requestCode == requestAudio) status.text = "Microphone permission is required for voice input."
     }
+
     override fun onDestroy() {
         speechRecognizer?.destroy(); tts?.stop(); tts?.shutdown(); super.onDestroy()
     }
