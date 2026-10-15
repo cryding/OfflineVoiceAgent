@@ -723,12 +723,12 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }
         val response = when (command) {
             AssistantCommand.TAP_AT -> {
-                val match = Regex("""tap at\\s+(\\d+)\\s*,\\s*(\\d+)""", RegexOption.IGNORE_CASE).find(raw)
+                val match = Regex("""tap at\\s+(\d+)\\s*,\\s*(\d+)""", RegexOption.IGNORE_CASE).find(raw)
                 val ok = match?.let { AgentAccessibilityService.tapAt(it.groupValues[1].toInt(), it.groupValues[2].toInt()) }
                 if (ok == true) "Tap gesture sent to the requested screen coordinates." else "Screen control is disabled or the coordinates are invalid."
             }
             AssistantCommand.SWIPE -> {
-                val match = Regex("""swipe from\\s+(\\d+)\\s*,\\s*(\\d+)\\s+to\\s+(\\d+)\\s*,\\s*(\\d+)""", RegexOption.IGNORE_CASE).find(raw)
+                val match = Regex("""swipe from\\s+(\d+)\\s*,\\s*(\d+)\\s+to\\s+(\d+)\\s*,\\s*(\d+)""", RegexOption.IGNORE_CASE).find(raw)
                 val ok = match?.let { AgentAccessibilityService.swipe(it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), it.groupValues[4].toInt()) }
                 if (ok == true) "Swipe gesture sent." else "Screen control is disabled or the coordinates are invalid."
             }
