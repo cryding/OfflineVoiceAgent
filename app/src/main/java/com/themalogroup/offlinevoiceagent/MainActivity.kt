@@ -38,6 +38,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private var clearPending = false
     private var wakeModeEnabled = false
     private var awaitingWakeCommand = false
+    private var recognitionInProgress = false
     private val wakeHandler = Handler(Looper.getMainLooper())
     @Volatile private var llmEngine: LocalLlmEngine? = null
     private val requestAudio = 41
@@ -63,16 +64,17 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     override fun onBufferReceived(buffer: ByteArray?) {}
                     override fun onEndOfSpeech() { status.text = "Processing speech…" }
                     override fun onError(error: Int) {
+                        recognitionInProgress = false
                         if (wakeModeEnabled) scheduleWakeListen(800L)
                         else status.text = "Recognition error $error. Try again or type a command."
                     }
                     override fun onResults(results: Bundle?) {
+                        recognitionInProgress = false
                         val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
                         transcript.text = text.ifBlank { "No speech recognized." }
                         if (wakeModeEnabled) processWakeResult(text)
                         else {
                             if (text.isNotBlank()) handleCommand(text)
-                            status.text = if (llmEngine == null) "Ready · Basic commands" else "Ready · Local model loaded"
                         }
                     }
                     override fun onPartialResults(partialResults: Bundle?) {
@@ -145,6 +147,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     awaitingWakeCommand = false
                     wakeHandler.removeCallbacksAndMessages(null)
                     try { speechRecognizer?.cancel() } catch (_: Exception) {}
+                    recognitionInProgress = false
                     text = "Enable Hey Maya wake mode"
                     status.text = "Wake mode stopped · microphone is not listening"
                 } else {
@@ -191,6 +194,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     ).apply { bottomMargin = 10 }
 
     private fun beginListening() {
+        if (recognitionInProgress || isFinishing) return
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), requestAudio)
             return
@@ -202,8 +206,13 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
         }
-        try { recognizer.startListening(intent) } catch (e: Exception) {
+        try {
+            recognitionInProgress = true
+            recognizer.startListening(intent)
+        } catch (e: Exception) {
+            recognitionInProgress = false
             status.text = "Could not start microphone: ${e.localizedMessage ?: "unknown error"}"
+            if (wakeModeEnabled) scheduleWakeListen(1500L)
         }
     }
 
@@ -377,6 +386,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             AssistantCommand.UNKNOWN -> "No local model is loaded. Import a compatible MediaPipe .task model to enable on-device AI responses."
         }
         answer.text = response
+        status.text = if (command == AssistantCommand.UNKNOWN) "No matching local command" else "Command complete"
         if (ttsReady && command != AssistantCommand.STOP_SPEAKING) {
             tts?.speak(response, TextToSpeech.QUEUE_FLUSH, null, "offline-agent-response")
         }
@@ -419,6 +429,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             awaitingWakeCommand = false
             wakeHandler.removeCallbacksAndMessages(null)
             try { speechRecognizer?.cancel() } catch (_: Exception) {}
+            recognitionInProgress = false
             status.text = "Wake mode paused when app left the screen"
         }
         super.onPause()
