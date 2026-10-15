@@ -32,4 +32,6 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("com.google.mediapipe:tasks-genai:0.10.27")
     testImplementation("junit:junit:4.13.2")
+    // Use a real JSON implementation in local JVM tests; Android's mock android.jar throws at runtime.
+    testImplementation("org.json:json:20240303")
 }
