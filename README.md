@@ -16,6 +16,8 @@ A free native Android voice assistant for Android 8.0+ and devices such as Motor
 - Model import checks known file size, available storage, and a 6 GiB safety cap before initializing inference.
 - System file picker supports local TXT, MD, CSV, JSON and LOG preview; with a loaded local model, it can summarize the selected text file on-device (maximum 1 MiB).
 - Speech-recognition state guard to reduce overlapping listen attempts; command completion status is no longer overwritten immediately by the recognition callback.
+- Wake-mode recognition errors use capped exponential retry delays (up to 12 seconds), and the wake button resets when the app pauses.
+- Model inference, replacement, unload and Activity destruction are serialized through a lifecycle lock to reduce engine close/use races.
 - Unit tests for command routing and wake-phrase parsing.
 - GitHub Actions tests, debug APK build, and artifact upload.
 
