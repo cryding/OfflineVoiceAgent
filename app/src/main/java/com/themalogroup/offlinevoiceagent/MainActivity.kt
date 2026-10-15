@@ -530,6 +530,33 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     "Choose a file in Android's system file picker."
                 } catch (_: Exception) { "No compatible file picker was found." }
             }
+            AssistantCommand.OPEN_CAMERA ->
+                launchTool(Intent("android.media.action.IMAGE_CAPTURE"), "Opening Camera.")
+            AssistantCommand.OPEN_BROWSER ->
+                launchTool(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com")), "Opening your browser.")
+            AssistantCommand.OPEN_MAPS ->
+                launchTool(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=")), "Opening Maps.")
+            AssistantCommand.OPEN_YOUTUBE ->
+                launchTool(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com")), "Opening YouTube.")
+            AssistantCommand.OPEN_PHONE ->
+                launchTool(Intent(Intent.ACTION_DIAL), "Opening the phone dialer.")
+            AssistantCommand.OPEN_ALARM ->
+                launchTool(Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS), "Opening your alarms.")
+            AssistantCommand.OPEN_WIFI_SETTINGS ->
+                launchTool(Intent(android.provider.Settings.ACTION_WIFI_SETTINGS), "Opening Wi-Fi settings.")
+            AssistantCommand.OPEN_BLUETOOTH_SETTINGS ->
+                launchTool(Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS), "Opening Bluetooth settings.")
+            AssistantCommand.WEB_SEARCH -> {
+                val query = when {
+                    raw.lowercase(Locale.ROOT).startsWith("search web for ") -> raw.substringAfter("search web for ", "")
+                    raw.lowercase(Locale.ROOT).startsWith("google ") -> raw.substringAfter("google ", "")
+                    raw.startsWith("ওয়েবে খোঁজো ") -> raw.substringAfter("ওয়েবে খোঁজো ", "")
+                    else -> raw
+                }.trim()
+                if (query.isBlank()) "Maya needs a search phrase. Say: search web for …"
+                else launchTool(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=" + Uri.encode(query))),
+                    "Searching the web for: $query")
+            }
             AssistantCommand.REMEMBER -> {
                 val note = CommandRouter.memoryText(raw)
                 if (memory.add(note)) "I saved this note on your phone: $note" else "Tell me what you want me to remember."
