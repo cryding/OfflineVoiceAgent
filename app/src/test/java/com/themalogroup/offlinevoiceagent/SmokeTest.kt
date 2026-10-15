@@ -90,4 +90,20 @@ class SmokeTest {
         assertEquals(AssistantCommand.CLEAR_MEMORY, CommandRouter.route("forget all memories"))
         assertEquals(AssistantCommand.CONFIRM_CLEAR, CommandRouter.route("confirm clear memory"))
     }
+
+    @Test fun screenTaskPlannerAcceptsOnlyBoundedAllowListedActions() {
+        val valid = ScreenTaskPlanner.parse("""[{"action":"tap","value":"Search"},{"action":"type","value":"science facts"},{"action":"read","value":""}]""")
+        assertEquals(3, valid.size)
+        assertEquals("tap", valid.first().action)
+        assertEquals(emptyList<ScreenTaskPlanner.Step>(), ScreenTaskPlanner.parse("""[{"action":"launch_app","value":"browser"}]"""))
+        assertEquals(emptyList<ScreenTaskPlanner.Step>(), ScreenTaskPlanner.parse("""[{"action":"type","value":"my OTP is 123456"}]"""))
+        assertEquals(emptyList<ScreenTaskPlanner.Step>(), ScreenTaskPlanner.parse("""[{"action":"tap","value":"Pay now"}]"""))
+        assertEquals(emptyList<ScreenTaskPlanner.Step>(), ScreenTaskPlanner.parse("""[{"action":"read","value":""},{"action":"read","value":""},{"action":"read","value":""},{"action":"read","value":""},{"action":"read","value":""}]"""))
+    }
+
+    @Test fun screenTaskPlannerBlocksSensitiveGoalsButAllowsOrdinaryTasks() {
+        assertEquals(true, ScreenTaskPlanner.isSensitiveGoal("open payment and pay now"))
+        assertEquals(true, ScreenTaskPlanner.isSensitiveGoal("পেমেন্ট করো"))
+        assertEquals(false, ScreenTaskPlanner.isSensitiveGoal("search for science news"))
+    }
 }
