@@ -177,6 +177,19 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 }
             }
         }
+        val accessibilityButton = Button(this).apply {
+            text = "Enable screen control (Accessibility)"
+            setOnClickListener {
+                try {
+                    startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    status.text = "Enable Offline Voice Agent screen control in Accessibility settings, then return here."
+                } catch (_: Exception) { status.text = "Could not open Accessibility settings." }
+            }
+        }
+        val readScreenButton = Button(this).apply {
+            text = "Read current screen"
+            setOnClickListener { showScreenSnapshot() }
+        }
         val mic = Button(this).apply {
             text = "🎙  Tap to speak"; textSize = 18f
             setOnClickListener { beginListening() }
@@ -231,7 +244,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 if (value.isNotEmpty()) { transcript.text = value; handleCommand(value) }
             }
         }
-        listOf(title, status, modelButton, unloadButton, viewChatButton, clearChatButton, mic, wakeButton, backgroundWakeButton, stopBackgroundWakeButton, label("YOU SAID"), transcript,
+        listOf(title, status, modelButton, unloadButton, viewChatButton, clearChatButton, accessibilityButton, readScreenButton, mic, wakeButton, backgroundWakeButton, stopBackgroundWakeButton, label("YOU SAID"), transcript,
             label("ASSISTANT"), answer, input, run,
             label("Model files stay on this phone. Use a MediaPipe LLM Inference compatible .task model; ordinary GGUF files are not supported by this runtime."),
             label("Offline speech depends on your installed Android speech service and language pack.")).forEach {
@@ -240,6 +253,19 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         scroll.addView(content)
         root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         setContentView(root)
+    }
+
+    private fun screenAction(action: (android.view.accessibility.AccessibilityNodeInfo) -> Boolean): String? {
+        val ok = AgentAccessibilityService.performOnActiveRoot(action) ?: return null
+        return if (ok) "Screen action performed." else "No suitable scrollable screen control was found."
+    }
+
+    private fun showScreenSnapshot(): String {
+        val snapshot = AgentAccessibilityService.readActiveScreen()
+        val message = snapshot ?: "Screen control is not enabled. Tap Enable screen control, enable the service in Android Accessibility settings, then try again."
+        answer.text = message
+        status.text = if (snapshot == null) "Accessibility service unavailable" else "Current screen read locally"
+        return message
     }
 
     private fun label(value: String) = TextView(this).apply {
@@ -516,6 +542,23 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             }
         }
         val response = when (command) {
+            AssistantCommand.ACCESSIBILITY_SETTINGS -> launchTool(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS), "Opening Accessibility settings. Enable Offline Voice Agent screen control there.")
+            AssistantCommand.READ_SCREEN -> showScreenSnapshot()
+            AssistantCommand.SCROLL_DOWN -> screenAction { it.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_SCROLL_FORWARD) } ?: "Screen control is not enabled. Enable Accessibility first."
+            AssistantCommand.SCROLL_UP -> screenAction { it.performAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD) } ?: "Screen control is not enabled. Enable Accessibility first."
+            AssistantCommand.TAP_SCREEN_LABEL -> {
+                val target = raw.substringAfter("tap ", raw.substringAfter("click ", raw.substringAfter("ট্যাপ করো ", ""))).trim()
+                AgentAccessibilityService.tapText(target) ?: "Screen control is not enabled. Enable Accessibility first."
+            }
+            AssistantCommand.TYPE_SCREEN_TEXT -> {
+                val value = when {
+                    raw.lowercase(Locale.ROOT).startsWith("type ") -> raw.substringAfter("type ")
+                    raw.startsWith("টাইপ করো ") -> raw.substringAfter("টাইপ করো ")
+                    else -> ""
+                }.trim()
+                if (value.isBlank()) "Say: type [text]."
+                else AgentAccessibilityService.typeText(value) ?: "Screen control is not enabled. Enable Accessibility first."
+            }
             AssistantCommand.TIME -> "The time is " + SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date())
             AssistantCommand.DATE -> "Today is " + SimpleDateFormat("EEEE, d MMMM yyyy", Locale.getDefault()).format(Date())
             AssistantCommand.HELLO -> "Hello! I can answer time and date questions, open phone tools, and remember notes locally."
@@ -592,7 +635,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 } else "No memory deletion is pending. Say forget all memories first if you want to delete them."
             }
             AssistantCommand.STOP_SPEAKING -> { tts?.stop(); "Speech stopped." }
-            AssistantCommand.HELP -> "I’m Maya, your offline companion. Try time/date, open camera/browser/maps/YouTube/dialer, search YouTube for a phrase, open Wi-Fi or Bluetooth settings, set alarm, search web for a phrase, open contacts/calendar, choose file, or ask me to remember a note. Some actions open an app and may need your confirmation."
+            AssistantCommand.HELP -> "I’m Maya, your offline companion. Try time/date, open camera/browser/maps/YouTube/dialer, search YouTube, read screen, tap [visible label], scroll down/up, type [text], open Accessibility settings, search web, contacts/calendar, or remember a note. Screen controls require enabling Accessibility permission."
             AssistantCommand.UNKNOWN -> if (llmEngine == null) "I can do phone actions offline, but for open-ended conversation please import a compatible local .task AI model." else "I’m here with you. Ask me naturally, or say “help” to hear the tools I can open."
         }
         answer.text = response
