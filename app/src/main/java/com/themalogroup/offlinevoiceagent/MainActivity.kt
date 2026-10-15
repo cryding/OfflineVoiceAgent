@@ -39,6 +39,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private val requestFile = 42
     private val requestModel = 43
     private val prefs by lazy { getSharedPreferences("offline_agent_model", MODE_PRIVATE) }
+    private val chatHistory by lazy { ChatHistoryStore(getSharedPreferences("offline_agent_chat", MODE_PRIVATE)) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -113,6 +114,14 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 }.start()
             }
         }
+        val clearChatButton = Button(this).apply {
+            text = "Clear local chat history"
+            setOnClickListener {
+                chatHistory.clear()
+                status.text = "Local conversation history cleared"
+                answer.text = "Previous AI conversation context has been deleted from this phone."
+            }
+        }
         val mic = Button(this).apply {
             text = "🎙  Tap to speak"; textSize = 18f
             setOnClickListener { beginListening() }
@@ -133,7 +142,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 if (value.isNotEmpty()) { transcript.text = value; handleCommand(value) }
             }
         }
-        listOf(title, status, modelButton, unloadButton, mic, label("YOU SAID"), transcript,
+        listOf(title, status, modelButton, unloadButton, clearChatButton, mic, label("YOU SAID"), transcript,
             label("ASSISTANT"), answer, input, run,
             label("Model files stay on this phone. Use a MediaPipe LLM Inference compatible .task model; ordinary GGUF files are not supported by this runtime."),
             label("Offline speech depends on your installed Android speech service and language pack.")).forEach {
@@ -239,7 +248,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 status.text = "Generating response on device…"
                 Thread {
                     try {
-                        val response = engine.generate(raw)
+                        val prompt = chatHistory.buildPrompt(raw, memory.all())
+                        val response = engine.generate(prompt).trim().ifBlank { "The local model returned an empty response. Try a shorter question." }
+                        chatHistory.append(raw, response)
                         runOnUiThread {
                             answer.text = response
                             status.text = "Local model response ready"
