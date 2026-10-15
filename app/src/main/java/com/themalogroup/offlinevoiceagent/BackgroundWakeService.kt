@@ -16,6 +16,7 @@ import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.speech.tts.TextToSpeech
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -31,11 +32,15 @@ class BackgroundWakeService : Service() {
     private var listening = false
     private var stopped = false
     private var retryCount = 0
+    private var awaitingCommand = false
+    private var tts: TextToSpeech? = null
+    private var ttsReady = false
     private val handler = Handler(Looper.getMainLooper())
 
     override fun onCreate() {
         super.onCreate()
         createChannel()
+        tts = TextToSpeech(applicationContext) { result -> ttsReady = result == TextToSpeech.SUCCESS }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -93,8 +98,22 @@ class BackgroundWakeService : Service() {
                 listening = false
                 retryCount = 0
                 val spoken = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
-                if (WakeWordParser.containsWakePhrase(spoken)) {
-                    showWakeNotification(WakeWordParser.commandAfterWake(spoken))
+                when {
+                    awaitingCommand && spoken.isNotBlank() -> {
+                        awaitingCommand = false
+                        showWakeNotification(spoken)
+                        speak("I heard you. Tap my notification to run that command.")
+                    }
+                    WakeWordParser.containsWakePhrase(spoken) -> {
+                        val command = WakeWordParser.commandAfterWake(spoken)
+                        if (command.isNotBlank()) {
+                            showWakeNotification(command)
+                            speak("Got it. Tap my notification to run that.")
+                        } else {
+                            awaitingCommand = true
+                            speak("Yes? I’m listening.")
+                        }
+                    }
                 }
                 listenAgain(350L)
             }
@@ -123,6 +142,10 @@ class BackgroundWakeService : Service() {
                 listenAgain(2_000L)
             }
         }, delay)
+    }
+
+    private fun speak(message: String) {
+        if (ttsReady) tts?.speak(message, TextToSpeech.QUEUE_FLUSH, null, "maya-wake")
     }
 
     private fun showWakeNotification(command: String) {
@@ -182,6 +205,9 @@ class BackgroundWakeService : Service() {
         try { recognizer?.destroy() } catch (_: Exception) {}
         recognizer = null
         listening = false
+        tts?.stop()
+        tts?.shutdown()
+        tts = null
         super.onDestroy()
     }
 
