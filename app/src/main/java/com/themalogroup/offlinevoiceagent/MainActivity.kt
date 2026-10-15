@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.speech.RecognitionListener
@@ -42,6 +43,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private var recognitionInProgress = false
     private var wakeRetryCount = 0
     private var wakeModeButton: Button? = null
+    private var pendingBackgroundWake = false
     @Volatile private var chatEpoch = 0L
     private val wakeHandler = Handler(Looper.getMainLooper())
     @Volatile private var llmEngine: LocalLlmEngine? = null
@@ -56,6 +58,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private val requestAudio = 41
     private val requestFile = 42
     private val requestModel = 43
+    private val requestNotifications = 44
     private val MAX_MODEL_BYTES = 6L * 1024L * 1024L * 1024L
     private val MIN_FREE_SPACE_AFTER_IMPORT = 256L * 1024L * 1024L
     private val MAX_TEXT_FILE_BYTES = 1024 * 1024
@@ -69,6 +72,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         tts = TextToSpeech(this, this)
         buildUi()
         restoreModelIfPresent()
+        handleBackgroundWakeIntent(intent)
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
             status.text = "Speech recognition service is unavailable."
         } else {
@@ -200,6 +204,17 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             }
         }
         wakeModeButton = wakeButton
+        val backgroundWakeButton = Button(this).apply {
+            text = "Start background Hey Maya"
+            setOnClickListener { requestAndStartBackgroundWake() }
+        }
+        val stopBackgroundWakeButton = Button(this).apply {
+            text = "Stop background wake service"
+            setOnClickListener {
+                stopService(Intent(this@MainActivity, BackgroundWakeService::class.java))
+                status.text = "Background wake service stopped"
+            }
+        }
         transcript = TextView(this).apply {
             text = "Your speech will appear here."; textSize = 18f
             setPadding(16, 18, 16, 18); setBackgroundColor(0xFFFFE9DC.toInt())
@@ -216,7 +231,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 if (value.isNotEmpty()) { transcript.text = value; handleCommand(value) }
             }
         }
-        listOf(title, status, modelButton, unloadButton, viewChatButton, clearChatButton, mic, wakeButton, label("YOU SAID"), transcript,
+        listOf(title, status, modelButton, unloadButton, viewChatButton, clearChatButton, mic, wakeButton, backgroundWakeButton, stopBackgroundWakeButton, label("YOU SAID"), transcript,
             label("ASSISTANT"), answer, input, run,
             label("Model files stay on this phone. Use a MediaPipe LLM Inference compatible .task model; ordinary GGUF files are not supported by this runtime."),
             label("Offline speech depends on your installed Android speech service and language pack.")).forEach {
@@ -233,6 +248,48 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private fun matchWrap() = LinearLayout.LayoutParams(
         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
     ).apply { bottomMargin = 10 }
+
+    private fun requestAndStartBackgroundWake() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            pendingBackgroundWake = true
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), requestAudio)
+            return
+        }
+        if (Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            pendingBackgroundWake = true
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), requestNotifications)
+            return
+        }
+        startBackgroundWakeService()
+    }
+
+    private fun startBackgroundWakeService() {
+        pendingBackgroundWake = false
+        try {
+            ContextCompat.startForegroundService(this, Intent(this, BackgroundWakeService::class.java))
+            status.text = "Background wake service starting · keep its ongoing notification visible"
+        } catch (e: Exception) {
+            status.text = "Could not start background wake service: " + (e.localizedMessage ?: "check microphone permission")
+        }
+    }
+
+    private fun handleBackgroundWakeIntent(source: Intent?) {
+        val command = source?.getStringExtra(BackgroundWakeService.EXTRA_WAKE_COMMAND).orEmpty()
+        if (command.isNotBlank()) {
+            transcript.text = "Hey Maya, $command"
+            handleCommand(command)
+        } else if (source?.hasExtra(BackgroundWakeService.EXTRA_WAKE_COMMAND) == true) {
+            status.text = "Hey Maya detected in background · say your command after opening the app"
+            if (ttsReady) tts?.speak("Yes? I am listening.", TextToSpeech.QUEUE_FLUSH, null, "background-wake")
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleBackgroundWakeIntent(intent)
+    }
 
     private fun beginListening() {
         if (recognitionInProgress || isFinishing) return
@@ -579,8 +636,20 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == requestAudio && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) beginListening()
-        else if (requestCode == requestAudio) status.text = "Microphone permission is required for voice input."
+        when (requestCode) {
+            requestAudio -> {
+                if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+                    if (pendingBackgroundWake) requestAndStartBackgroundWake() else beginListening()
+                } else {
+                    pendingBackgroundWake = false
+                    status.text = "Microphone permission is required for voice input and background wake."
+                }
+            }
+            requestNotifications -> {
+                if (pendingBackgroundWake) startBackgroundWakeService()
+                else status.text = "Notification permission was not granted."
+            }
+        }
     }
 
     override fun onPause() {
