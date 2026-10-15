@@ -51,24 +51,31 @@ class ChatHistoryStore(private val preferences: SharedPreferences) {
     }
 
     fun buildPrompt(userText: String, notes: List<String>): String {
-        val recent = load().takeLast(CONTEXT_TURNS)
+        // Keep prompts bounded for small on-device context windows (e.g. Qwen ekv1280).
+        val recent = load().takeLast(2)
+        val current = userText.trim().take(MAX_CURRENT_USER_CHARS)
         return buildString {
             append("You are a helpful offline voice assistant. Answer clearly and honestly. ")
             append("You have no internet access; do not claim to have checked live information. ")
             if (notes.isNotEmpty()) {
                 append("\nUser-approved saved notes (use only when relevant):\n")
-                notes.take(MAX_NOTES).forEach { append("- ").append(it.take(250)).append('\n') }
+                notes.take(3).forEach { append("- ").append(it.take(120)).append('\n') }
             }
             if (recent.isNotEmpty()) {
-                append("\nRecent conversation for context:\n")
+                append("\nRecent conversation for context (most recent turns only):\n")
                 recent.forEach { turn ->
-                    append("User: ").append(turn.user).append('\n')
-                    append("Assistant: ").append(turn.assistant).append('\n')
+                    append("User: ").append(turn.user.take(180)).append('\n')
+                    append("Assistant: ").append(turn.assistant.take(220)).append('\n')
                 }
             }
-            append("\nCurrent user message: ").append(userText.trim().take(MAX_USER_CHARS))
+            append("\nCurrent user message: ").append(current)
             append("\nAssistant:")
-        }
+        }.take(MAX_PROMPT_CHARS)
+            .let { prompt ->
+                // Preserve the current question even if saved context was unusually large.
+                if (prompt.contains("Current user message:")) prompt
+                else "You are a helpful offline assistant. Answer honestly.\nCurrent user message: $current\nAssistant:"
+            }
     }
 
     companion object {
@@ -76,6 +83,8 @@ class ChatHistoryStore(private val preferences: SharedPreferences) {
         private const val MAX_TURNS = 20
         private const val CONTEXT_TURNS = 6
         private const val MAX_USER_CHARS = 1000
+        private const val MAX_CURRENT_USER_CHARS = 800
+        private const val MAX_PROMPT_CHARS = 2600
         private const val MAX_ASSISTANT_CHARS = 2000
         private const val MAX_NOTES = 10
     }
