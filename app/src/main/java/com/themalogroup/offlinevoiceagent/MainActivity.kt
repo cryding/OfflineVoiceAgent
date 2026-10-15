@@ -142,6 +142,21 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 answer.text = "Previous AI conversation context has been deleted from this phone."
             }
         }
+        val viewChatButton = Button(this).apply {
+            text = "View local chat history"
+            setOnClickListener {
+                val turns = chatHistory.load()
+                if (turns.isEmpty()) {
+                    answer.text = "No saved AI conversation turns yet."
+                    status.text = "Local chat history is empty"
+                } else {
+                    answer.text = turns.joinToString("\n\n") { turn ->
+                        "You: ${turn.user}\nMaya: ${turn.assistant}"
+                    }
+                    status.text = "Showing ${turns.size} saved conversation turns · stored on this phone"
+                }
+            }
+        }
         val mic = Button(this).apply {
             text = "🎙  Tap to speak"; textSize = 18f
             setOnClickListener { beginListening() }
@@ -182,7 +197,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 if (value.isNotEmpty()) { transcript.text = value; handleCommand(value) }
             }
         }
-        listOf(title, status, modelButton, unloadButton, clearChatButton, mic, wakeButton, label("YOU SAID"), transcript,
+        listOf(title, status, modelButton, unloadButton, viewChatButton, clearChatButton, mic, wakeButton, label("YOU SAID"), transcript,
             label("ASSISTANT"), answer, input, run,
             label("Model files stay on this phone. Use a MediaPipe LLM Inference compatible .task model; ordinary GGUF files are not supported by this runtime."),
             label("Offline speech depends on your installed Android speech service and language pack.")).forEach {
