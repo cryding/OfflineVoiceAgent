@@ -5,16 +5,16 @@ import com.google.mediapipe.tasks.genai.llminference.LlmInference
 import java.io.Closeable
 
 /**
- * On-device inference for compatible MediaPipe .task language models.
- * A random GGUF file or arbitrary model download is not compatible.
+ * On-device inference for MediaPipe-compatible .task language models.
+ * Model-specific context settings are inferred from the original downloaded filename.
  */
-class LocalLlmEngine(context: Context, modelPath: String) : Closeable {
+class LocalLlmEngine(context: Context, modelPath: String, modelName: String = modelPath) : Closeable {
     private val inference: LlmInference
 
     init {
         val options = LlmInference.LlmInferenceOptions.builder()
             .setModelPath(modelPath)
-            .setMaxTokens(512)
+            .setMaxTokens(ModelRuntimeConfig.maxTokensFor(modelName))
             .build()
         inference = LlmInference.createFromOptions(context.applicationContext, options)
     }
