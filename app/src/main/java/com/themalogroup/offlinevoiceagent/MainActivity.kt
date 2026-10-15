@@ -682,7 +682,33 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         engine.generate(prompt)
     }
 
+    private fun dispatchCommandSequence(raw: String): Boolean {
+        val parts = raw.split(Regex("""\s+then\s+|\s+and then\s+|\s+তারপর\s+|;""", RegexOption.IGNORE_CASE))
+            .map { it.trim() }.filter { it.isNotEmpty() }
+        if (parts.size <= 1) return false
+        if (parts.size > 5) {
+            answer.text = "For safety, Maya can run at most five explicit steps at a time."
+            status.text = "Task sequence too long"
+            return true
+        }
+        if (parts.any { CommandRouter.route(it) == AssistantCommand.UNKNOWN }) return false
+        answer.text = "Starting a multi-step command sequence."
+        status.text = "Running step 1 of " + parts.size
+        fun runStep(index: Int) {
+            if (index >= parts.size) {
+                status.text = "Sequence finished · check the visible app to confirm the result"
+                return
+            }
+            status.text = "Running step " + (index + 1) + " of " + parts.size
+            handleCommand(parts[index])
+            if (index + 1 < parts.size) wakeHandler.postDelayed({ runStep(index + 1) }, 900L)
+        }
+        runStep(0)
+        return true
+    }
+
     private fun handleCommand(raw: String) {
+        if (dispatchCommandSequence(raw)) return
         val command = CommandRouter.route(raw)
         if (command == AssistantCommand.UNKNOWN) {
             if (llmEngine != null) {
