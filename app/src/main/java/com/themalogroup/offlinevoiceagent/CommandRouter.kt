@@ -3,7 +3,7 @@ package com.themalogroup.offlinevoiceagent
 import java.util.Locale
 
 enum class AssistantCommand {
-    TIME, DATE, HELLO, OPEN_SETTINGS, OPEN_CONTACTS, OPEN_CALENDAR, PICK_FILE,
+    TIME, DATE, HELLO, OPEN_SETTINGS, OPEN_CONTACTS, FIND_CONTACT, OPEN_CALENDAR, PICK_FILE,
     REMEMBER, RECALL, LIST_MEMORY, CLEAR_MEMORY, CONFIRM_CLEAR, STOP_SPEAKING, HELP, UNKNOWN
 }
 
@@ -34,6 +34,8 @@ object CommandRouter {
                 AssistantCommand.HELP
             command in setOf("settings", "open settings", "phone settings") || command.startsWith("open settings ") ||
                 command == "সেটিংস খোলো" -> AssistantCommand.OPEN_SETTINGS
+            command.startsWith("find contact ") || command.startsWith("search contact ") || command.startsWith("look up contact ") ||
+                command.startsWith("কন্টাক্ট খোঁজো ") || command.startsWith("নাম্বার খোঁজো ") -> AssistantCommand.FIND_CONTACT
             command in setOf("contacts", "open contacts", "contact list", "my contacts", "কন্টাক্ট খোলো") ->
                 AssistantCommand.OPEN_CONTACTS
             command in setOf("calendar", "open calendar", "my calendar", "schedule", "ক্যালেন্ডার খোলো") ->
@@ -46,6 +48,13 @@ object CommandRouter {
                 AssistantCommand.HELLO
             else -> AssistantCommand.UNKNOWN
         }
+    }
+
+    fun contactQuery(raw: String): String {
+        val value = raw.trim()
+        val prefixes = listOf("find contact ", "search contact ", "look up contact ", "কন্টাক্ট খোঁজো ", "নাম্বার খোঁজো ")
+        val prefix = prefixes.firstOrNull { value.lowercase(Locale.ROOT).startsWith(it) } ?: return ""
+        return value.drop(prefix.length).trim()
     }
 
     fun memoryText(raw: String): String {
