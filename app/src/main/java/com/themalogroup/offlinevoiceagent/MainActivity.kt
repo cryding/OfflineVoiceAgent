@@ -538,6 +538,21 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 launchTool(Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=")), "Opening Maps.")
             AssistantCommand.OPEN_YOUTUBE ->
                 launchTool(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com")), "Opening YouTube.")
+            AssistantCommand.SEARCH_YOUTUBE -> {
+                val normalized = raw.lowercase(Locale.ROOT)
+                val query = when {
+                    normalized.startsWith("search youtube for ") -> raw.substringAfter("search youtube for ", "")
+                    normalized.startsWith("youtube search ") -> raw.substringAfter("youtube search ", "")
+                    raw.startsWith("ইউটিউবে খোঁজো ") -> raw.substringAfter("ইউটিউবে খোঁজো ", "")
+                    raw.startsWith("ইউটিউবে সার্চ করো ") -> raw.substringAfter("ইউটিউবে সার্চ করো ", "")
+                    else -> ""
+                }.trim()
+                if (query.isBlank()) "Maya needs a YouTube search phrase. Say: search YouTube for science facts."
+                else launchTool(
+                    Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/results?search_query=" + Uri.encode(query))),
+                    "Searching YouTube for: $query"
+                )
+            }
             AssistantCommand.OPEN_PHONE ->
                 launchTool(Intent(Intent.ACTION_DIAL), "Opening the phone dialer.")
             AssistantCommand.OPEN_ALARM ->
@@ -577,7 +592,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 } else "No memory deletion is pending. Say forget all memories first if you want to delete them."
             }
             AssistantCommand.STOP_SPEAKING -> { tts?.stop(); "Speech stopped." }
-            AssistantCommand.HELP -> "I’m Maya, your offline companion. Try time/date, open camera/browser/maps/YouTube/dialer, open Wi-Fi or Bluetooth settings, set alarm, search web for a phrase, open contacts/calendar, choose file, or ask me to remember a note. Some actions open an app and may need your confirmation."
+            AssistantCommand.HELP -> "I’m Maya, your offline companion. Try time/date, open camera/browser/maps/YouTube/dialer, search YouTube for a phrase, open Wi-Fi or Bluetooth settings, set alarm, search web for a phrase, open contacts/calendar, choose file, or ask me to remember a note. Some actions open an app and may need your confirmation."
             AssistantCommand.UNKNOWN -> if (llmEngine == null) "I can do phone actions offline, but for open-ended conversation please import a compatible local .task AI model." else "I’m here with you. Ask me naturally, or say “help” to hear the tools I can open."
         }
         answer.text = response
