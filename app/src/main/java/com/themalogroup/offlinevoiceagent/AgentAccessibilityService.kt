@@ -3,6 +3,9 @@ package com.themalogroup.offlinevoiceagent
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.graphics.Rect
+import android.graphics.Path
+import android.accessibilityservice.GestureDescription
+import android.os.Build
 import android.os.Bundle
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -100,6 +103,40 @@ class AgentAccessibilityService : AccessibilityService() {
             }
             return "No clickable control matched: $query"
         }
+        fun tapAt(x: Int, y: Int): Boolean? {
+            val service = instance ?: return null
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N || x < 0 || y < 0) return false
+            val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
+            val gesture = GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(path, 0, 70)).build()
+            return try { service.dispatchGesture(gesture, null, null) } catch (_: Exception) { false }
+        }
+        fun swipe(startX: Int, startY: Int, endX: Int, endY: Int): Boolean? {
+            val service = instance ?: return null
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N || listOf(startX, startY, endX, endY).any { it < 0 }) return false
+            val path = Path().apply { moveTo(startX.toFloat(), startY.toFloat()); lineTo(endX.toFloat(), endY.toFloat()) }
+            val gesture = GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(path, 0, 350)).build()
+            return try { service.dispatchGesture(gesture, null, null) } catch (_: Exception) { false }
+        }
+        fun globalAction(action: Int): Boolean? {
+            val service = instance ?: return null
+            return try { service.performGlobalAction(action) } catch (_: Exception) { false }
+        }
+        fun pressEnter(): Boolean? {
+            val service = instance ?: return null
+            val root = service.rootInActiveWindow ?: return false
+            fun find(node: AccessibilityNodeInfo?, depth: Int): AccessibilityNodeInfo? {
+                if (node == null || depth > 12) return null
+                if (node.isEditable && node.isFocused) return node
+                for (i in 0 until node.childCount) {
+                    val found = find(node.getChild(i), depth + 1)
+                    if (found != null) return found
+                }
+                return null
+            }
+            val field = find(root, 0) ?: return false
+            return try { field.performAction(AccessibilityNodeInfo.ACTION_IME_ENTER) } catch (_: Exception) { false }
+        }
+
         fun typeText(value: String): String? {
             val service = instance ?: return null
             val root = service.rootInActiveWindow ?: return "No active screen is available."
