@@ -236,7 +236,10 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 answer.text = "AI model loaded. Ask a question or give a command."
             }
         } catch (e: Exception) {
-            if (prefs.getString("model_path", null) != path) File(path).delete()
+            if (prefs.getString("model_path", null) == path) {
+                prefs.edit().remove("model_path").apply()
+            }
+            File(path).delete()
             runOnUiThread {
                 status.text = "Could not load this model. It may be incompatible or too large: ${e.localizedMessage ?: "initialization error"}"
             }
