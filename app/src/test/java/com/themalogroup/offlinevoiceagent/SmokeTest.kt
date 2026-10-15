@@ -37,6 +37,21 @@ class SmokeTest {
         assertEquals(AssistantCommand.UNKNOWN, CommandRouter.route("please remember my memories are important"))
     }
 
+    @Test fun routesBengaliTimeAndMemoryCommands() {
+        assertEquals(AssistantCommand.TIME, CommandRouter.route("এখন সময় কত"))
+        assertEquals(AssistantCommand.TIME, CommandRouter.route("এখন সময় কত"))
+        assertEquals(AssistantCommand.REMEMBER, CommandRouter.route("মনে রেখো আমি বাংলায় কথা বলতে পছন্দ করি"))
+        assertEquals("আমি বাংলায় কথা বলতে পছন্দ করি", CommandRouter.memoryText("মনে রেখো আমি বাংলায় কথা বলতে পছন্দ করি"))
+        assertEquals(AssistantCommand.RECALL, CommandRouter.route("আমার কথা মনে আছে"))
+        assertEquals(AssistantCommand.LIST_MEMORY, CommandRouter.route("নোট দেখাও"))
+    }
+
+    @Test fun rejectsAmbiguousPhoneActionPhrases() {
+        assertEquals(AssistantCommand.UNKNOWN, CommandRouter.route("maybe open settings later"))
+        assertEquals(AssistantCommand.UNKNOWN, CommandRouter.route("my calendar is busy"))
+        assertEquals(AssistantCommand.UNKNOWN, CommandRouter.route("I like the word time"))
+    }
+
     @Test fun routesLocalMemoryCommands() {
         assertEquals(AssistantCommand.REMEMBER, CommandRouter.route("remember that I prefer Bengali"))
         assertEquals("I prefer Bengali", CommandRouter.memoryText("remember that I prefer Bengali"))
