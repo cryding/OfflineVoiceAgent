@@ -40,6 +40,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private var wakeModeEnabled = false
     private var awaitingWakeCommand = false
     private var recognitionInProgress = false
+    private var wakeRetryCount = 0
+    private var wakeModeButton: Button? = null
     @Volatile private var chatEpoch = 0L
     private val wakeHandler = Handler(Looper.getMainLooper())
     @Volatile private var llmEngine: LocalLlmEngine? = null
@@ -71,11 +73,12 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     override fun onEndOfSpeech() { status.text = "Processing speech…" }
                     override fun onError(error: Int) {
                         recognitionInProgress = false
-                        if (wakeModeEnabled) scheduleWakeListen(800L)
+                        if (wakeModeEnabled) scheduleWakeListen(nextWakeRetryDelay())
                         else status.text = "Recognition error $error. Try again or type a command."
                     }
                     override fun onResults(results: Bundle?) {
                         recognitionInProgress = false
+                        wakeRetryCount = 0
                         val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
                         transcript.text = text.ifBlank { "No speech recognized." }
                         if (wakeModeEnabled) processWakeResult(text)
@@ -167,6 +170,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 if (wakeModeEnabled) {
                     wakeModeEnabled = false
                     awaitingWakeCommand = false
+                    wakeRetryCount = 0
                     wakeHandler.removeCallbacksAndMessages(null)
                     try { speechRecognizer?.cancel() } catch (_: Exception) {}
                     recognitionInProgress = false
@@ -175,12 +179,14 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 } else {
                     wakeModeEnabled = true
                     awaitingWakeCommand = false
+                    wakeRetryCount = 0
                     text = "Stop Hey Maya wake mode"
                     status.text = "Starting wake mode… say Hey Maya"
                     beginListening()
                 }
             }
         }
+        wakeModeButton = wakeButton
         transcript = TextView(this).apply {
             text = "Your speech will appear here."; textSize = 18f
             setPadding(16, 18, 16, 18); setBackgroundColor(0xFFFFE9DC.toInt())
@@ -234,7 +240,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         } catch (e: Exception) {
             recognitionInProgress = false
             status.text = "Could not start microphone: ${e.localizedMessage ?: "unknown error"}"
-            if (wakeModeEnabled) scheduleWakeListen(1500L)
+            if (wakeModeEnabled) scheduleWakeListen(nextWakeRetryDelay())
         }
     }
 
@@ -266,6 +272,12 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             status.text = "Wake mode active · say Hey Maya"
             scheduleWakeListen(500L)
         }
+    }
+
+    private fun nextWakeRetryDelay(): Long {
+        val attempt = wakeRetryCount.coerceAtMost(4)
+        wakeRetryCount = (wakeRetryCount + 1).coerceAtMost(5)
+        return (800L * (1L shl attempt)).coerceAtMost(12_000L)
     }
 
     private fun scheduleWakeListen(delayMs: Long) {
@@ -525,9 +537,11 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         if (wakeModeEnabled) {
             wakeModeEnabled = false
             awaitingWakeCommand = false
+            wakeRetryCount = 0
             wakeHandler.removeCallbacksAndMessages(null)
             try { speechRecognizer?.cancel() } catch (_: Exception) {}
             recognitionInProgress = false
+            wakeModeButton?.text = "Enable Hey Maya wake mode"
             status.text = "Wake mode paused when app left the screen"
         }
         super.onPause()
