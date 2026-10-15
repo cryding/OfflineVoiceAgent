@@ -4,6 +4,8 @@ import java.util.Locale
 
 enum class AssistantCommand {
     TIME, DATE, HELLO, OPEN_SETTINGS, OPEN_CONTACTS, OPEN_CALENDAR, PICK_FILE,
+    OPEN_CAMERA, OPEN_BROWSER, OPEN_MAPS, OPEN_YOUTUBE, OPEN_PHONE, OPEN_ALARM,
+    OPEN_WIFI_SETTINGS, OPEN_BLUETOOTH_SETTINGS, WEB_SEARCH,
     REMEMBER, RECALL, LIST_MEMORY, CLEAR_MEMORY, CONFIRM_CLEAR, STOP_SPEAKING, HELP, UNKNOWN
 }
 
@@ -39,6 +41,24 @@ object CommandRouter {
                 AssistantCommand.OPEN_CALENDAR
             command in setOf("files", "open file", "open files", "choose file", "pick a file", "ফাইল খোলো") ->
                 AssistantCommand.PICK_FILE
+            command in setOf("open camera", "camera kholo", "ক্যামেরা খোলো", "ক্যামেরা চালু করো") ->
+                AssistantCommand.OPEN_CAMERA
+            command in setOf("open browser", "open internet", "browser kholo", "ব্রাউজার খোলো") ->
+                AssistantCommand.OPEN_BROWSER
+            command in setOf("open maps", "open google maps", "navigate", "ম্যাপ খোলো", "গুগল ম্যাপ খোলো") ->
+                AssistantCommand.OPEN_MAPS
+            command in setOf("open youtube", "youtube kholo", "ইউটিউব খোলো") ->
+                AssistantCommand.OPEN_YOUTUBE
+            command in setOf("open phone", "open dialer", "dialer kholo", "ফোন খোলো", "ডায়ালার খোলো") ->
+                AssistantCommand.OPEN_PHONE
+            command in setOf("set alarm", "open alarm", "alarm kholo", "অ্যালার্ম দাও", "অ্যালার্ম খোলো") ->
+                AssistantCommand.OPEN_ALARM
+            command in setOf("wifi settings", "open wifi settings", "ওয়াইফাই সেটিংস") ->
+                AssistantCommand.OPEN_WIFI_SETTINGS
+            command in setOf("bluetooth settings", "open bluetooth settings", "ব্লুটুথ সেটিংস") ->
+                AssistantCommand.OPEN_BLUETOOTH_SETTINGS
+            command.startsWith("search web for ") || command.startsWith("google ") || command.startsWith("ওয়েবে খোঁজো ") ->
+                AssistantCommand.WEB_SEARCH
             timePattern.containsMatchIn(command) -> AssistantCommand.TIME
             datePattern.containsMatchIn(command) -> AssistantCommand.DATE
             command == "hello" || command == "hi" || command == "hey" || command == "হ্যালো" || command == "নমস্কার" ->
