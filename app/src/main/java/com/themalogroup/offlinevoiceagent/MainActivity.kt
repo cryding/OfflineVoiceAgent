@@ -936,6 +936,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 } else "No memory deletion is pending. Say forget all memories first if you want to delete them."
             }
             AssistantCommand.STOP_SPEAKING -> { tts?.stop(); "Speech stopped." }
+            AssistantCommand.SCREEN_TASK -> "Screen task request received."
             AssistantCommand.HELP -> "I’m Maya, your offline companion. Try time/date, open camera/browser/maps/YouTube/dialer, search YouTube, read screen, tap [visible label], tap at x,y, swipe from x,y to x,y, scroll down/up, type [text], press enter/back/home, open Accessibility settings, search web, contacts/calendar, or remember a note. Screen controls require enabling Accessibility permission."
             AssistantCommand.UNKNOWN -> if (llmEngine == null) "I can do phone actions offline, but for open-ended conversation please import a compatible local .task AI model." else "I’m here with you. Ask me naturally, or say “help” to hear the tools I can open."
         }
