@@ -13,6 +13,17 @@ class WakeWordParserTest {
         assertFalse(WakeWordParser.containsWakePhrase("maya, what time is it"))
     }
 
+    @Test fun extractsCommandsAfterWakePhraseWithPunctuation() {
+        assertEquals("open settings", WakeWordParser.commandAfterWake("Hey Maya: open settings"))
+        assertEquals("তারিখ বলো", WakeWordParser.commandAfterWake("হেই মায়া, তারিখ বলো"))
+        assertEquals("", WakeWordParser.commandAfterWake("Hey Maya"))
+    }
+
+    @Test fun rejectsPartialOrEmbeddedEnglishWakePhrase() {
+        assertFalse(WakeWordParser.containsWakePhrase("hey mayas, open settings"))
+        assertFalse(WakeWordParser.containsWakePhrase("they maya said hello"))
+    }
+
     @Test fun detectsBengaliWakePhrase() {
         assertTrue(WakeWordParser.containsWakePhrase("\u09b9\u09c7\u0987 \u09ae\u09be\u09af\u09bc\u09be"))
     }
