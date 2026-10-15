@@ -707,9 +707,99 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         return true
     }
 
+    /**
+     * Runs a short, local-model-planned UI task. Actions are allow-listed, bounded, and
+     * re-check the accessibility tree after each action. This is not an unrestricted agent.
+     */
+    private fun startScreenTask(raw: String) {
+        val goal = raw.substringAfter("screen task ", "").trim()
+            .ifBlank { raw.substringAfter("স্ক্রিনে কাজ ", "").trim() }
+        if (goal.isBlank()) {
+            answer.text = "Say: screen task [what you want done]."
+            status.text = "A task goal is required"
+            return
+        }
+        if (ScreenTaskPlanner.isSensitiveGoal(goal)) {
+            answer.text = "For safety, I won't automate payments, purchases, account/security changes, or destructive actions. Please do that part manually."
+            status.text = "Sensitive task blocked"
+            return
+        }
+        val initialScreen = AgentAccessibilityService.readActiveScreen()
+        if (initialScreen == null) {
+            answer.text = "Enable Offline Voice Agent in Android Accessibility settings before asking me to operate another app."
+            status.text = "Accessibility service unavailable"
+            return
+        }
+        if (llmEngine == null) {
+            answer.text = "Import a compatible local .task model first. Screen task planning runs on-device."
+            status.text = "Local model required"
+            return
+        }
+        answer.text = "Planning a short screen task locally…"
+        status.text = "Reading current screen and planning"
+        val requestEpoch = chatEpoch
+        Thread {
+            try {
+                val prompt = ScreenTaskPlanner.buildPrompt(goal, initialScreen)
+                val rawPlan = generateWithCurrentModel(prompt)
+                val steps = ScreenTaskPlanner.parse(rawPlan)
+                runOnUiThread {
+                    if (requestEpoch != chatEpoch || activityDestroyed) return@runOnUiThread
+                    if (steps.isEmpty()) {
+                        answer.text = "I couldn't create a safe, valid action plan. Try a more specific task or use a direct voice command."
+                        status.text = "No safe plan produced"
+                        return@runOnUiThread
+                    }
+                    answer.text = "Plan ready (" + steps.size + " steps). I’ll stop if an action fails and re-read the screen after each step."
+                    executeScreenTaskStep(steps, 0, requestEpoch)
+                }
+            } catch (e: Exception) {
+                runOnUiThread {
+                    if (requestEpoch == chatEpoch && !activityDestroyed) {
+                        answer.text = "Screen task planning failed: " + (e.localizedMessage ?: "local model error")
+                        status.text = "Planning failed"
+                    }
+                }
+            }
+        }.start()
+    }
+
+    private fun executeScreenTaskStep(steps: List<ScreenTaskPlanner.Step>, index: Int, requestEpoch: Long) {
+        if (requestEpoch != chatEpoch || activityDestroyed) return
+        if (index >= steps.size) {
+            val finalScreen = AgentAccessibilityService.readActiveScreen().orEmpty()
+            answer.text = "Finished the allowed action plan. Please check the current screen to confirm the goal is complete.\n\nCurrent screen:\n" + finalScreen
+            status.text = "Plan finished · result not independently guaranteed"
+            return
+        }
+        val step = steps[index]
+        status.text = "Screen task · step " + (index + 1) + "/" + steps.size
+        val result = when (step.action) {
+            "tap" -> AgentAccessibilityService.tapText(step.value) ?: "Accessibility service unavailable."
+            "type" -> AgentAccessibilityService.typeText(step.value) ?: "Accessibility service unavailable."
+            "scroll_down" -> if (AgentAccessibilityService.scroll(true) == true) "Scrolled down." else "Could not scroll down."
+            "scroll_up" -> if (AgentAccessibilityService.scroll(false) == true) "Scrolled up." else "Could not scroll up."
+            "back" -> if (AgentAccessibilityService.globalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK) == true) "Went back." else "Could not go back."
+            "read" -> AgentAccessibilityService.readActiveScreen() ?: "Accessibility service unavailable."
+            else -> "Rejected unsupported action."
+        }
+        val failed = listOf("No clickable control matched", "No editable text field", "Could not scroll", "Could not go back", "Accessibility service unavailable", "Rejected unsupported action").any { result.contains(it, ignoreCase = true) }
+        val screenAfter = AgentAccessibilityService.readActiveScreen().orEmpty()
+        answer.text = "Step " + (index + 1) + ": " + step.action + " " + step.value.take(80) + "\n" + result + "\n\nScreen after action:\n" + screenAfter
+        if (failed) {
+            status.text = "Stopped safely after an unsuccessful step"
+            return
+        }
+        wakeHandler.postDelayed({ executeScreenTaskStep(steps, index + 1, requestEpoch) }, 800L)
+    }
+
     private fun handleCommand(raw: String) {
         if (dispatchCommandSequence(raw)) return
         val command = CommandRouter.route(raw)
+        if (command == AssistantCommand.SCREEN_TASK) {
+            startScreenTask(raw)
+            return
+        }
         if (command == AssistantCommand.UNKNOWN) {
             if (llmEngine != null) {
                 answer.text = "Thinking locally…"
