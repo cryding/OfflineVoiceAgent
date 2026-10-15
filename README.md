@@ -11,13 +11,16 @@ A free native Android voice assistant for Android 8.0+ and devices such as Motor
 - Local notes stored in app-private preferences, with confirmation before clearing.
 - Bounded conversation history (up to 20 turns) stored in app-private preferences; the latest six turns and user-approved saved notes are included as context for local LLM prompts. Use **Clear local chat history** to erase this history.
 - Optional on-device LLM integration through MediaPipe LLM Inference. Use the **Import local AI model (.task)** button to select a compatible model file. The app copies it into app-private storage, initializes inference, and routes general questions to the local model.
-- Unit tests for command routing and memory commands.
+- Conservative English/Bengali command routing with regression tests for accidental substring matches.
+- Ordered, deduplicated, bounded local notes with migration from the earlier preferences format.
+- Speech-recognition state guard to reduce overlapping listen attempts; command completion status is no longer overwritten immediately by the recognition callback.
+- Unit tests for command routing and wake-phrase parsing.
 - GitHub Actions tests, debug APK build, and artifact upload.
 
 ## Model compatibility and device requirements
 The model must be a model package compatible with MediaPipe LLM Inference, with a `.task` extension. An arbitrary GGUF file is not compatible with this runtime. Model files can be several gigabytes; use a model that fits your phone's available RAM and storage. The app does not download models or use paid APIs.
 
-The runtime integration is implemented in source but must still be validated with a compatible model on the physical phone. Initialization can fail for unsupported model packaging, insufficient memory, or unsupported operators. Do not assume every model is compatible.
+The runtime integration is implemented in source but must still be validated with a compatible model on the physical phone. The current CI checks compile/tests and debug APK packaging; it does not prove model inference, wake-word accuracy, or offline speech on a real device. Initialization can fail for unsupported model packaging, insufficient memory, or unsupported operators. Do not assume every model is compatible.
 
 ## Offline limitations
 Speech recognition may use network services despite the offline preference; true offline speech input depends on the installed provider and language pack. TTS is offline only if an appropriate voice is installed. Verify airplane-mode behavior on the physical device. No WhatsApp message automation or general app-control agent is included.
