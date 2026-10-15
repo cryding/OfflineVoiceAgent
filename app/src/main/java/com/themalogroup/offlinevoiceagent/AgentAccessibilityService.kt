@@ -61,6 +61,22 @@ class AgentAccessibilityService : AccessibilityService() {
             val root = service.rootInActiveWindow ?: return false
             return try { action(root) } catch (_: Exception) { false }
         }
+        fun scroll(forward: Boolean): Boolean? {
+            val service = instance ?: return null
+            val root = service.rootInActiveWindow ?: return false
+            fun findScrollable(node: AccessibilityNodeInfo?, depth: Int): AccessibilityNodeInfo? {
+                if (node == null || depth > 12) return null
+                if (node.isScrollable && node.isEnabled) return node
+                for (i in 0 until node.childCount) {
+                    val found = findScrollable(node.getChild(i), depth + 1)
+                    if (found != null) return found
+                }
+                return null
+            }
+            val target = findScrollable(root, 0) ?: return false
+            return try { target.performAction(if (forward) AccessibilityNodeInfo.ACTION_SCROLL_FORWARD else AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD) }
+            catch (_: Exception) { false }
+        }
         fun tapText(query: String): String? {
             val service = instance ?: return null
             val root = service.rootInActiveWindow ?: return "No active screen is available."
