@@ -8,6 +8,7 @@ A free native Android voice assistant for Android 8.0+ and devices such as Motor
 - Android TextToSpeech output when a compatible voice is installed.
 - Basic command router for time/date, greeting, help, Settings, Contacts, Calendar and Android file picker.
 - Local notes stored in app-private preferences, with confirmation before clearing.
+- Bounded conversation history (up to 20 turns) stored in app-private preferences; the latest six turns and user-approved saved notes are included as context for local LLM prompts. Use **Clear local chat history** to erase this history.
 - Optional on-device LLM integration through MediaPipe LLM Inference. Use the **Import local AI model (.task)** button to select a compatible model file. The app copies it into app-private storage, initializes inference, and routes general questions to the local model.
 - Unit tests for command routing and memory commands.
 - GitHub Actions tests, debug APK build, and artifact upload.
