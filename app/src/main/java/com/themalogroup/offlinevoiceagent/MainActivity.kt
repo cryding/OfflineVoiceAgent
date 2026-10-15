@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -18,6 +19,8 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -31,14 +34,18 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private var tts: TextToSpeech? = null
     private var ttsReady = false
     private var clearPending = false
+    @Volatile private var llmEngine: LocalLlmEngine? = null
     private val requestAudio = 41
     private val requestFile = 42
+    private val requestModel = 43
+    private val prefs by lazy { getSharedPreferences("offline_agent_model", MODE_PRIVATE) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         memory = LocalMemory(this)
         tts = TextToSpeech(this, this)
         buildUi()
+        restoreModelIfPresent()
         if (!SpeechRecognizer.isRecognitionAvailable(this)) {
             status.text = "Speech recognition service is unavailable."
         } else {
@@ -54,7 +61,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                         val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
                         transcript.text = text.ifBlank { "No speech recognized." }
                         if (text.isNotBlank()) handleCommand(text)
-                        status.text = "Ready"
+                        status.text = if (llmEngine == null) "Ready · Basic commands" else "Ready · Local model loaded"
                     }
                     override fun onPartialResults(partialResults: Bundle?) {
                         val partial = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
@@ -79,8 +86,32 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             setTextColor(0xFF171411.toInt())
         }
         status = TextView(this).apply {
-            text = "Ready · Local memory enabled"; textSize = 15f
+            text = "Ready · Import a compatible local model to enable AI replies"; textSize = 15f
             gravity = Gravity.CENTER; setPadding(0, 14, 0, 20)
+        }
+        val modelButton = Button(this).apply {
+            text = "📦 Import local AI model (.task)"
+            setOnClickListener {
+                val picker = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "application/octet-stream"
+                }
+                try { startActivityForResult(picker, requestModel) }
+                catch (_: Exception) { status.text = "Could not open the system file picker." }
+            }
+        }
+        val unloadButton = Button(this).apply {
+            text = "Unload local model"
+            setOnClickListener {
+                Thread {
+                    try { llmEngine?.close() } catch (_: Exception) {}
+                    llmEngine = null
+                    runOnUiThread {
+                        status.text = "Model unloaded"
+                        answer.text = "Local model unloaded. Basic commands remain available."
+                    }
+                }.start()
+            }
         }
         val mic = Button(this).apply {
             text = "🎙  Tap to speak"; textSize = 18f
@@ -91,10 +122,10 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             setPadding(16, 18, 16, 18); setBackgroundColor(0xFFFFE9DC.toInt())
         }
         answer = TextView(this).apply {
-            text = "Try: time, date, open settings, or “remember that I prefer Bengali”."
+            text = "Try: time, date, open settings, or ask a question after importing a compatible MediaPipe .task model."
             textSize = 17f; setTextColor(0xFF4B4038.toInt()); setPadding(16, 18, 16, 18)
         }
-        val input = EditText(this).apply { hint = "Or type a command…"; textSize = 16f }
+        val input = EditText(this).apply { hint = "Ask or type a command…"; textSize = 16f }
         val run = Button(this).apply {
             text = "Run command"
             setOnClickListener {
@@ -102,8 +133,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 if (value.isNotEmpty()) { transcript.text = value; handleCommand(value) }
             }
         }
-        listOf(title, status, mic, label("YOU SAID"), transcript, label("ASSISTANT"), answer, input, run,
-            label("Memory stays on this device. Say “list memories” or “forget all memories” to manage it."),
+        listOf(title, status, modelButton, unloadButton, mic, label("YOU SAID"), transcript,
+            label("ASSISTANT"), answer, input, run,
+            label("Model files stay on this phone. Use a MediaPipe LLM Inference compatible .task model; ordinary GGUF files are not supported by this runtime."),
             label("Offline speech depends on your installed Android speech service and language pack.")).forEach {
             content.addView(it, matchWrap())
         }
@@ -136,8 +168,90 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun restoreModelIfPresent() {
+        val path = prefs.getString("model_path", null) ?: return
+        if (!File(path).isFile) {
+            prefs.edit().remove("model_path").apply()
+            return
+        }
+        loadModel(path)
+    }
+
+    private fun importModel(uri: Uri) {
+        status.text = "Copying model into app-private storage…"
+        Thread {
+            var copied: File? = null
+            try {
+                val name = queryDisplayName(uri) ?: "local-model.task"
+                if (!name.lowercase(Locale.ROOT).endsWith(".task")) {
+                    throw IllegalArgumentException("Choose a MediaPipe-compatible .task model. GGUF is not supported by this runtime.")
+                }
+                val modelDir = File(filesDir, "models").apply { mkdirs() }
+                copied = File(modelDir, "assistant-model.task")
+                contentResolver.openInputStream(uri).use { input ->
+                    requireNotNull(input) { "Could not read the selected file." }
+                    FileOutputStream(copied).use { output -> input.copyTo(output) }
+                }
+                prefs.edit().putString("model_path", copied.absolutePath).apply()
+                runOnUiThread { status.text = "Model copied. Initializing on-device inference…" }
+                initializeModel(copied.absolutePath)
+            } catch (e: Exception) {
+                runOnUiThread { status.text = "Model import failed: ${e.localizedMessage ?: "unsupported model"}" }
+            }
+        }.start()
+    }
+
+    private fun queryDisplayName(uri: Uri): String? {
+        contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) return cursor.getString(0)
+        }
+        return null
+    }
+
+    private fun loadModel(path: String) {
+        status.text = "Loading saved local model…"
+        Thread { initializeModel(path) }.start()
+    }
+
+    private fun initializeModel(path: String) {
+        try {
+            val next = LocalLlmEngine(this, path)
+            val old = llmEngine
+            llmEngine = next
+            try { old?.close() } catch (_: Exception) {}
+            runOnUiThread {
+                status.text = "Local LLM loaded · inference runs on this device"
+                answer.text = "AI model loaded. Ask a question or give a command."
+            }
+        } catch (e: Exception) {
+            runOnUiThread {
+                status.text = "Could not load this model. It may be incompatible or too large: ${e.localizedMessage ?: "initialization error"}"
+            }
+        }
+    }
+
     private fun handleCommand(raw: String) {
         val command = CommandRouter.route(raw)
+        if (command == AssistantCommand.UNKNOWN) {
+            val engine = llmEngine
+            if (engine != null) {
+                answer.text = "Thinking locally…"
+                status.text = "Generating response on device…"
+                Thread {
+                    try {
+                        val response = engine.generate(raw)
+                        runOnUiThread {
+                            answer.text = response
+                            status.text = "Local model response ready"
+                            if (ttsReady) tts?.speak(response, TextToSpeech.QUEUE_FLUSH, null, "offline-agent-response")
+                        }
+                    } catch (e: Exception) {
+                        runOnUiThread { answer.text = "Local inference failed: ${e.localizedMessage ?: "unknown error"}"; status.text = "Model inference error" }
+                    }
+                }.start()
+                return
+            }
+        }
         val response = when (command) {
             AssistantCommand.TIME -> "The time is " + SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date())
             AssistantCommand.DATE -> "Today is " + SimpleDateFormat("EEEE, d MMMM yyyy", Locale.getDefault()).format(Date())
@@ -173,8 +287,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 } else "No memory deletion is pending. Say forget all memories first if you want to delete them."
             }
             AssistantCommand.STOP_SPEAKING -> { tts?.stop(); "Speech stopped." }
-            AssistantCommand.HELP -> "Try: what time is it, today's date, open settings, open contacts, open calendar, choose file, remember that I prefer Bengali, list memories, or forget all memories."
-            AssistantCommand.UNKNOWN -> "I don't have a safe built-in action for that yet. Try Help. A local LLM is not integrated yet."
+            AssistantCommand.HELP -> "Try time/date, open settings, open contacts, open calendar, choose file, remember a note, or ask a question with a compatible local model loaded."
+            AssistantCommand.UNKNOWN -> "No local model is loaded. Import a compatible MediaPipe .task model to enable on-device AI responses."
         }
         answer.text = response
         if (ttsReady && command != AssistantCommand.STOP_SPEAKING) {
@@ -187,6 +301,14 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             if (intent.resolveActivity(packageManager) == null) "No compatible app is installed for this action."
             else { startActivity(intent); successMessage }
         } catch (_: Exception) { "Android could not open that app." }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode != RESULT_OK || data?.data == null) return
+        when (requestCode) {
+            requestModel -> importModel(data.data!!)
+        }
     }
 
     override fun onInit(code: Int) {
@@ -206,6 +328,11 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
 
     override fun onDestroy() {
-        speechRecognizer?.destroy(); tts?.stop(); tts?.shutdown(); super.onDestroy()
+        speechRecognizer?.destroy()
+        tts?.stop()
+        tts?.shutdown()
+        try { llmEngine?.close() } catch (_: Exception) {}
+        llmEngine = null
+        super.onDestroy()
     }
 }
