@@ -2,32 +2,33 @@
 
 A free native Android voice-assistant project targeting Android 8.0+ and Motorola Edge 50 Fusion.
 
-## Implemented so far
-- Kotlin Android app and warm-colour interface.
-- Microphone permission flow and Android SpeechRecognizer with offline preference requested.
-- Android TextToSpeech response when a compatible voice is installed.
-- Tested command router for time/date, greeting, help, Settings, Contacts, Calendar, file picker, and stop-speaking commands.
-- External app actions launch Android system/app intents; choosing a file uses Android's system document picker.
-- GitHub Actions workflow runs unit tests, builds a debug APK, and uploads the APK as an artifact.
+## Implemented
+- Kotlin Android app with microphone permission flow.
+- Android SpeechRecognizer with offline preference requested; actual offline availability depends on the installed speech provider and language pack.
+- Android TextToSpeech output when a compatible voice is installed.
+- Basic command router for time/date, greeting, help, Settings, Contacts, Calendar and Android file picker.
+- Local notes: say or type `remember that I prefer Bengali`, `list memories`, or `what do you remember`. Data is stored in this app's private preferences on the device; it is not cloud-synced. To delete notes, use `forget all memories`, then type `confirm clear memory`.
+- Unit tests for command routing and memory command parsing.
+- GitHub Actions workflow to run tests, build a debug APK, and upload the artifact.
 
-## Important limitations
-This is **not yet a complete local-LLM agent**. Android SpeechRecognizer may use a network service despite the offline preference; offline recognition depends on the installed provider and language pack. TTS is offline only if a suitable voice is installed. No Gemma/Llama/Qwen model, Whisper runtime, Piper runtime, WhatsApp message automation, or general app-control agent is integrated yet. Those require further implementation and real-device/offline testing.
+## Not yet implemented
+This is **not yet a complete local-LLM agent**. No Gemma/Llama/Qwen inference runtime, Whisper runtime, Piper runtime, WhatsApp messaging automation, or general app-control agent is included. Android SpeechRecognizer may use network services despite the offline preference. Real offline operation must be tested with airplane mode on a physical device.
 
-## Build and download APK using a phone
+## Build APK on a phone
 1. Open the Actions tab.
-2. Select **Android APK**. Use **Run workflow**, or wait for the automatic run after a push.
+2. Select **Android APK** and run it, or wait for the workflow after a push.
 3. Wait for a successful run.
 4. Open that run and download **OfflineVoiceAgent-debug-apk** under Artifacts.
-5. Extract the ZIP on your phone and install `app-debug.apk`. Allow installation from your browser/files app if Android asks.
+5. Extract the ZIP and install `app-debug.apk`. Android may ask permission to install from that source.
 
-This is a debug APK and does not include an LLM model. Do not describe it as a production release or as fully offline until the model runtime and offline tests are completed.
+This is a debug APK and does not bundle an LLM model. Do not treat it as a production release.
 
 ## Privacy
-No custom backend or analytics is configured. Microphone access is requested when you tap the mic. Android's speech provider determines whether speech is processed locally; check its offline language-pack settings.
+No custom backend or analytics is configured. Microphone permission is requested only for voice input. Saved notes remain in app-private local preferences unless the user clears them or uninstalls the app. Speech processing location depends on the installed Android speech provider.
 
 ## Roadmap
 1. Verify CI build and install on a physical device.
-2. Integrate an on-device LLM and a downloadable quantized model.
+2. Integrate an on-device LLM runtime and model import/download flow.
 3. Integrate fully local speech recognition.
 4. Add a dependable offline TTS voice.
 5. Add permission-gated tools with confirmation for external actions.
