@@ -129,7 +129,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             setOnClickListener {
                 val picker = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
                     addCategory(Intent.CATEGORY_OPENABLE)
-                    type = "application/octet-stream"
+                    type = "*/*"
                 }
                 try { startActivityForResult(picker, requestModel) }
                 catch (_: Exception) { status.text = "Could not open the system file picker." }
@@ -361,7 +361,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private fun restoreModelIfPresent() {
         val path = prefs.getString("model_path", null) ?: return
         if (!File(path).isFile) {
-            prefs.edit().remove("model_path").apply()
+            prefs.edit().remove("model_path").remove("model_name").apply()
             return
         }
         loadModel(path)
@@ -395,7 +395,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     throw IllegalArgumentException("The selected model is empty or exceeds the 6 GiB safety limit.")
                 }
                 runOnUiThread { status.text = "Model copied. Initializing on-device inference…" }
-                initializeModel(copied.absolutePath, generation)
+                initializeModel(copied.absolutePath, generation, name)
             } catch (e: Exception) {
                 copied?.delete()
                 runOnUiThread {
@@ -428,13 +428,13 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private fun loadModel(path: String) {
         val generation = beginModelRequest()
         status.text = "Loading saved local model…"
-        Thread { initializeModel(path, generation) }.start()
+        Thread { initializeModel(path, generation, prefs.getString("model_name", File(path).name) ?: File(path).name) }.start()
     }
 
-    private fun initializeModel(path: String, generation: Long) {
+    private fun initializeModel(path: String, generation: Long, modelName: String = File(path).name) {
         var candidate: LocalLlmEngine? = null
         try {
-            val next = LocalLlmEngine(this, path)
+            val next = LocalLlmEngine(this, path, modelName)
             candidate = next
             val oldPath = prefs.getString("model_path", null)
             val accepted = synchronized(modelLock) {
@@ -444,7 +444,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     val old = llmEngine
                     llmEngine = next
                     try { old?.close() } catch (_: Exception) {}
-                    prefs.edit().putString("model_path", path).apply()
+                    prefs.edit().putString("model_path", path).putString("model_name", modelName).apply()
                     true
                 }
             }
