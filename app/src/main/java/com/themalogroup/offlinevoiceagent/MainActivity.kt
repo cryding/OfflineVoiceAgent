@@ -196,15 +196,15 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     throw IllegalArgumentException("Choose a MediaPipe-compatible .task model. GGUF is not supported by this runtime.")
                 }
                 val modelDir = File(filesDir, "models").apply { mkdirs() }
-                copied = File(modelDir, "assistant-model.task")
+                copied = File(modelDir, "assistant-model-${System.currentTimeMillis()}.task")
                 contentResolver.openInputStream(uri).use { input ->
                     requireNotNull(input) { "Could not read the selected file." }
                     FileOutputStream(copied).use { output -> input.copyTo(output) }
                 }
-                prefs.edit().putString("model_path", copied.absolutePath).apply()
                 runOnUiThread { status.text = "Model copied. Initializing on-device inference…" }
                 initializeModel(copied.absolutePath)
             } catch (e: Exception) {
+                copied?.delete()
                 runOnUiThread { status.text = "Model import failed: ${e.localizedMessage ?: "unsupported model"}" }
             }
         }.start()
@@ -225,14 +225,18 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private fun initializeModel(path: String) {
         try {
             val next = LocalLlmEngine(this, path)
+            val oldPath = prefs.getString("model_path", null)
             val old = llmEngine
             llmEngine = next
             try { old?.close() } catch (_: Exception) {}
+            prefs.edit().putString("model_path", path).apply()
+            if (oldPath != null && oldPath != path) File(oldPath).delete()
             runOnUiThread {
                 status.text = "Local LLM loaded · inference runs on this device"
                 answer.text = "AI model loaded. Ask a question or give a command."
             }
         } catch (e: Exception) {
+            if (prefs.getString("model_path", null) != path) File(path).delete()
             runOnUiThread {
                 status.text = "Could not load this model. It may be incompatible or too large: ${e.localizedMessage ?: "initialization error"}"
             }
