@@ -4,7 +4,7 @@ import java.util.Locale
 
 enum class AssistantCommand {
     TIME, DATE, HELLO, OPEN_SETTINGS, OPEN_CONTACTS, OPEN_CALENDAR, PICK_FILE,
-    OPEN_CAMERA, OPEN_BROWSER, OPEN_MAPS, OPEN_YOUTUBE, OPEN_PHONE, OPEN_ALARM,
+    OPEN_CAMERA, OPEN_BROWSER, OPEN_MAPS, OPEN_YOUTUBE, SEARCH_YOUTUBE, OPEN_PHONE, OPEN_ALARM,
     OPEN_WIFI_SETTINGS, OPEN_BLUETOOTH_SETTINGS, WEB_SEARCH,
     REMEMBER, RECALL, LIST_MEMORY, CLEAR_MEMORY, CONFIRM_CLEAR, STOP_SPEAKING, HELP, UNKNOWN
 }
@@ -47,7 +47,10 @@ object CommandRouter {
                 AssistantCommand.OPEN_BROWSER
             command in setOf("open maps", "open google maps", "navigate", "ম্যাপ খোলো", "গুগল ম্যাপ খোলো") ->
                 AssistantCommand.OPEN_MAPS
-            command in setOf("open youtube", "youtube kholo", "ইউটিউব খোলো") ->
+            command.startsWith("search youtube for ") || command.startsWith("youtube search ") ||
+                command.startsWith("ইউটিউবে খোঁজো ") || command.startsWith("ইউটিউবে সার্চ করো ") ->
+                AssistantCommand.SEARCH_YOUTUBE
+            command in setOf("open youtube", "youtube kholo", "ইউটিউব খোলো", "ইউটিউব চালু করো") ->
                 AssistantCommand.OPEN_YOUTUBE
             command in setOf("open phone", "open dialer", "dialer kholo", "ফোন খোলো", "ডায়ালার খোলো") ->
                 AssistantCommand.OPEN_PHONE
