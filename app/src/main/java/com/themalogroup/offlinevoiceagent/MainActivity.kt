@@ -6,6 +6,8 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -34,6 +36,9 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private var tts: TextToSpeech? = null
     private var ttsReady = false
     private var clearPending = false
+    private var wakeModeEnabled = false
+    private var awaitingWakeCommand = false
+    private val wakeHandler = Handler(Looper.getMainLooper())
     @Volatile private var llmEngine: LocalLlmEngine? = null
     private val requestAudio = 41
     private val requestFile = 42
@@ -52,17 +57,23 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         } else {
             speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this).also { recognizer ->
                 recognizer.setRecognitionListener(object : RecognitionListener {
-                    override fun onReadyForSpeech(params: Bundle?) { status.text = "Listening…" }
+                    override fun onReadyForSpeech(params: Bundle?) { status.text = if (wakeModeEnabled) "Wake mode active · say Hey Maya" else "Listening…" }
                     override fun onBeginningOfSpeech() { status.text = "Hearing your voice…" }
                     override fun onRmsChanged(rmsdB: Float) {}
                     override fun onBufferReceived(buffer: ByteArray?) {}
                     override fun onEndOfSpeech() { status.text = "Processing speech…" }
-                    override fun onError(error: Int) { status.text = "Recognition error $error. Try again or type a command." }
+                    override fun onError(error: Int) {
+                        if (wakeModeEnabled) scheduleWakeListen(800L)
+                        else status.text = "Recognition error $error. Try again or type a command."
+                    }
                     override fun onResults(results: Bundle?) {
                         val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
                         transcript.text = text.ifBlank { "No speech recognized." }
-                        if (text.isNotBlank()) handleCommand(text)
-                        status.text = if (llmEngine == null) "Ready · Basic commands" else "Ready · Local model loaded"
+                        if (wakeModeEnabled) processWakeResult(text)
+                        else {
+                            if (text.isNotBlank()) handleCommand(text)
+                            status.text = if (llmEngine == null) "Ready · Basic commands" else "Ready · Local model loaded"
+                        }
                     }
                     override fun onPartialResults(partialResults: Bundle?) {
                         val partial = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
@@ -126,6 +137,25 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             text = "🎙  Tap to speak"; textSize = 18f
             setOnClickListener { beginListening() }
         }
+        val wakeButton = Button(this).apply {
+            text = "Enable Hey Maya wake mode"
+            setOnClickListener {
+                if (wakeModeEnabled) {
+                    wakeModeEnabled = false
+                    awaitingWakeCommand = false
+                    wakeHandler.removeCallbacksAndMessages(null)
+                    try { speechRecognizer?.cancel() } catch (_: Exception) {}
+                    text = "Enable Hey Maya wake mode"
+                    status.text = "Wake mode stopped · microphone is not listening"
+                } else {
+                    wakeModeEnabled = true
+                    awaitingWakeCommand = false
+                    text = "Stop Hey Maya wake mode"
+                    status.text = "Starting wake mode… say Hey Maya"
+                    beginListening()
+                }
+            }
+        }
         transcript = TextView(this).apply {
             text = "Your speech will appear here."; textSize = 18f
             setPadding(16, 18, 16, 18); setBackgroundColor(0xFFFFE9DC.toInt())
@@ -142,7 +172,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 if (value.isNotEmpty()) { transcript.text = value; handleCommand(value) }
             }
         }
-        listOf(title, status, modelButton, unloadButton, clearChatButton, mic, label("YOU SAID"), transcript,
+        listOf(title, status, modelButton, unloadButton, clearChatButton, mic, wakeButton, label("YOU SAID"), transcript,
             label("ASSISTANT"), answer, input, run,
             label("Model files stay on this phone. Use a MediaPipe LLM Inference compatible .task model; ordinary GGUF files are not supported by this runtime."),
             label("Offline speech depends on your installed Android speech service and language pack.")).forEach {
@@ -175,6 +205,44 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         try { recognizer.startListening(intent) } catch (e: Exception) {
             status.text = "Could not start microphone: ${e.localizedMessage ?: "unknown error"}"
         }
+    }
+
+    private fun processWakeResult(recognizedText: String) {
+        val spoken = recognizedText.trim()
+        if (spoken.isBlank()) {
+            status.text = "Wake mode active · say Hey Maya"
+            scheduleWakeListen(500L)
+            return
+        }
+        if (awaitingWakeCommand) {
+            awaitingWakeCommand = false
+            handleCommand(spoken)
+            scheduleWakeListen(1800L)
+            return
+        }
+        if (WakeWordParser.containsWakePhrase(spoken)) {
+            val command = WakeWordParser.commandAfterWake(spoken)
+            if (command.isNotBlank()) {
+                handleCommand(command)
+                scheduleWakeListen(1800L)
+            } else {
+                awaitingWakeCommand = true
+                status.text = "Hey Maya activated · speak your command"
+                if (ttsReady) tts?.speak("Yes? I am listening.", TextToSpeech.QUEUE_FLUSH, null, "wake-acknowledgement")
+                scheduleWakeListen(1400L)
+            }
+        } else {
+            status.text = "Wake mode active · say Hey Maya"
+            scheduleWakeListen(500L)
+        }
+    }
+
+    private fun scheduleWakeListen(delayMs: Long) {
+        wakeHandler.removeCallbacksAndMessages(null)
+        if (!wakeModeEnabled || isFinishing) return
+        wakeHandler.postDelayed({
+            if (wakeModeEnabled && !isFinishing) beginListening()
+        }, delayMs)
     }
 
     private fun restoreModelIfPresent() {
@@ -345,7 +413,19 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         else if (requestCode == requestAudio) status.text = "Microphone permission is required for voice input."
     }
 
+    override fun onPause() {
+        if (wakeModeEnabled) {
+            wakeModeEnabled = false
+            awaitingWakeCommand = false
+            wakeHandler.removeCallbacksAndMessages(null)
+            try { speechRecognizer?.cancel() } catch (_: Exception) {}
+            status.text = "Wake mode paused when app left the screen"
+        }
+        super.onPause()
+    }
+
     override fun onDestroy() {
+        wakeHandler.removeCallbacksAndMessages(null)
         speechRecognizer?.destroy()
         tts?.stop()
         tts?.shutdown()
