@@ -7,34 +7,54 @@ enum class AssistantCommand {
     REMEMBER, RECALL, LIST_MEMORY, CLEAR_MEMORY, CONFIRM_CLEAR, STOP_SPEAKING, HELP, UNKNOWN
 }
 
+/**
+ * Conservative, deterministic command matching. Unknown or ambiguous input is left for the
+ * local language model instead of triggering a phone action by substring accident.
+ */
 object CommandRouter {
+    private val timePattern = Regex("""\b(time|clock)\b|সময়|সময়""")
+    private val datePattern = Regex("""\b(date|today|day)\b|তারিখ""")
+
     fun route(raw: String): AssistantCommand {
-        val command = raw.lowercase(Locale.ROOT).trim()
+        val command = raw.lowercase(Locale.ROOT).trim().replace(Regex("""\s+"""), " ")
         return when {
-            command == "confirm forget all" || command == "confirm clear memory" -> AssistantCommand.CONFIRM_CLEAR
-            command.contains("forget all memories") || command.contains("clear memory") || command.contains("delete all memories") -> AssistantCommand.CLEAR_MEMORY
-            command.contains("what do you remember") || command.contains("what did i ask you to remember") ||
-                command.contains("recall memory") || command.contains("আমার কথা মনে আছে") -> AssistantCommand.RECALL
-            command == "list memories" || command == "show memories" || command.contains("আমার মনে রাখা কথা") -> AssistantCommand.LIST_MEMORY
-            command.startsWith("remember that ") || command.startsWith("remember ") ||
-                command.startsWith("মনে রেখো ") || command.startsWith("মনে রাখো ") -> AssistantCommand.REMEMBER
-            command.contains("time") || command.contains("সময়") || command.contains("সময়") -> AssistantCommand.TIME
-            command.contains("date") || command.contains("তারিখ") -> AssistantCommand.DATE
-            command.contains("hello") || command.contains("হ্যালো") -> AssistantCommand.HELLO
-            command.contains("open settings") || command == "settings" || command.contains("সেটিংস") -> AssistantCommand.OPEN_SETTINGS
-            command.contains("open contacts") || command == "contacts" || command.contains("contact list") -> AssistantCommand.OPEN_CONTACTS
-            command.contains("open calendar") || command == "calendar" || command.contains("schedule") -> AssistantCommand.OPEN_CALENDAR
-            command.contains("open file") || command == "files" || command.contains("choose file") -> AssistantCommand.PICK_FILE
-            command.contains("stop speaking") || command == "stop" -> AssistantCommand.STOP_SPEAKING
-            command == "help" || command.contains("what can you do") || command.contains("সাহায্য") -> AssistantCommand.HELP
+            command in setOf("confirm forget all", "confirm clear memory", "হ্যাঁ, সব স্মৃতি মুছে দাও") ->
+                AssistantCommand.CONFIRM_CLEAR
+            containsAny(command, "forget all memories", "clear memory", "delete all memories", "forget everything",
+                "সব স্মৃতি মুছে দাও", "সব মনে রাখা কথা মুছে দাও") -> AssistantCommand.CLEAR_MEMORY
+            containsAny(command, "what do you remember", "what did i ask you to remember", "recall memory",
+                "আমার কথা মনে আছে", "আমি কী মনে রাখতে বলেছিলাম") -> AssistantCommand.RECALL
+            command in setOf("list memories", "show memories", "show my notes", "আমার মনে রাখা কথা", "নোট দেখাও") ->
+                AssistantCommand.LIST_MEMORY
+            startsWithAny(command, "remember that ", "remember ", "মনে রেখো ", "মনে রাখো ", "মনে রাখবে ") ->
+                AssistantCommand.REMEMBER
+            command in setOf("stop", "stop speaking", "quiet", "চুপ করো", "বলা বন্ধ করো") ->
+                AssistantCommand.STOP_SPEAKING
+            command == "help" || command == "what can you do" || command == "সাহায্য" ->
+                AssistantCommand.HELP
+            command in setOf("settings", "open settings", "phone settings") || command.startsWith("open settings ") ||
+                command == "সেটিংস খোলো" -> AssistantCommand.OPEN_SETTINGS
+            command in setOf("contacts", "open contacts", "contact list", "my contacts", "কন্টাক্ট খোলো") ->
+                AssistantCommand.OPEN_CONTACTS
+            command in setOf("calendar", "open calendar", "my calendar", "schedule", "ক্যালেন্ডার খোলো") ->
+                AssistantCommand.OPEN_CALENDAR
+            command in setOf("files", "open file", "open files", "choose file", "pick a file", "ফাইল খোলো") ->
+                AssistantCommand.PICK_FILE
+            timePattern.containsMatchIn(command) -> AssistantCommand.TIME
+            datePattern.containsMatchIn(command) -> AssistantCommand.DATE
+            command == "hello" || command == "hi" || command == "hey" || command == "হ্যালো" || command == "নমস্কার" ->
+                AssistantCommand.HELLO
             else -> AssistantCommand.UNKNOWN
         }
     }
 
     fun memoryText(raw: String): String {
         val value = raw.trim()
-        val prefixes = listOf("remember that ", "remember ", "মনে রেখো ", "মনে রাখো ")
-        val prefix = prefixes.firstOrNull { value.lowercase(Locale.ROOT).startsWith(it) }
-        return if (prefix == null) "" else value.drop(prefix.length).trim().trimEnd('.', '!', ' ')
+        val prefixes = listOf("remember that ", "remember ", "মনে রেখো ", "মনে রাখো ", "মনে রাখবে ")
+        val prefix = prefixes.firstOrNull { value.lowercase(Locale.ROOT).startsWith(it) } ?: return ""
+        return value.drop(prefix.length).trim().trimEnd('.', '!', '?', ' ')
     }
+
+    private fun containsAny(value: String, vararg phrases: String): Boolean = phrases.any(value::contains)
+    private fun startsWithAny(value: String, vararg prefixes: String): Boolean = prefixes.any(value::startsWith)
 }
