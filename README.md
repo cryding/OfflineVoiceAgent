@@ -5,6 +5,7 @@ A free native Android voice assistant for Android 8.0+ and devices such as Motor
 ## Implemented
 - Kotlin Android app with microphone permission flow.
 - Android SpeechRecognizer with offline preference requested; actual offline availability depends on the installed speech provider and language pack.
+- Optional **Hey Maya** wake mode while the app stays in the foreground: say “Hey Maya, what time is it?” or say “Hey Maya” and then your command. It also recognizes several Bengali spellings of the phrase. Wake mode stops when the app leaves the screen; this uses speech-to-text results, not a dedicated always-on acoustic hotword engine.
 - Android TextToSpeech output when a compatible voice is installed.
 - Basic command router for time/date, greeting, help, Settings, Contacts, Calendar and Android file picker.
 - Local notes stored in app-private preferences, with confirmation before clearing.
