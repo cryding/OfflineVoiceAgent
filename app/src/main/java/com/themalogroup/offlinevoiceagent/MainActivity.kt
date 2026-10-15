@@ -467,7 +467,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             }
             if (stillCurrent) {
                 if (prefs.getString("model_path", null) == path) {
-                    prefs.edit().remove("model_path").apply()
+                    prefs.edit().remove("model_path").remove("model_name").apply()
                 }
                 File(path).delete()
                 runOnUiThread {
