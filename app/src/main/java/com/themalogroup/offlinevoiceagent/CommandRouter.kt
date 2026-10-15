@@ -32,8 +32,7 @@ object CommandRouter {
                 AssistantCommand.STOP_SPEAKING
             command == "help" || command == "what can you do" || command == "সাহায্য" ->
                 AssistantCommand.HELP
-            command in setOf("settings", "open settings", "phone settings") || command.startsWith("open settings ") ||
-                command == "সেটিংস খোলো" -> AssistantCommand.OPEN_SETTINGS
+            command in setOf("settings", "open settings", "phone settings", "সেটিংস খোলো") -> AssistantCommand.OPEN_SETTINGS
             command in setOf("contacts", "open contacts", "contact list", "my contacts", "কন্টাক্ট খোলো") ->
                 AssistantCommand.OPEN_CONTACTS
             command in setOf("calendar", "open calendar", "my calendar", "schedule", "ক্যালেন্ডার খোলো") ->
