@@ -37,8 +37,8 @@ object CommandRouter {
             command in setOf("press back", "go back", "পিছনে যাও") -> AssistantCommand.PRESS_BACK
             command in setOf("press home", "go home", "হোমে যাও") -> AssistantCommand.PRESS_HOME
             command in setOf("press enter", "press search", "submit search", "সার্চ করো") -> AssistantCommand.PRESS_ENTER
-            command.matches(Regex("""tap at\\s+\\d+\\s*,\\s*\\d+""")) -> AssistantCommand.TAP_AT
-            command.matches(Regex("""swipe from\\s+\\d+\\s*,\\s*\\d+\\s+to\\s+\\d+\\s*,\\s*\\d+""")) -> AssistantCommand.SWIPE
+            command.matches(Regex("""tap at\s+\\d+\s*,\s*\\d+""")) -> AssistantCommand.TAP_AT
+            command.matches(Regex("""swipe from\s+\\d+\s*,\s*\\d+\s+to\s+\\d+\s*,\s*\\d+""")) -> AssistantCommand.SWIPE
             command in setOf("accessibility settings", "open accessibility settings", "screen control settings", "অ্যাক্সেসিবিলিটি সেটিংস") -> AssistantCommand.ACCESSIBILITY_SETTINGS
             command in setOf("read screen", "read this screen", "what is on my screen", "screen reader", "স্ক্রিন পড়ো", "স্ক্রিনে কী আছে") -> AssistantCommand.READ_SCREEN
             command in setOf("scroll down", "swipe down", "নিচে স্ক্রল করো", "নিচে যাও") -> AssistantCommand.SCROLL_DOWN
