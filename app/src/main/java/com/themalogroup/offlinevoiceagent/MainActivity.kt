@@ -109,35 +109,169 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
 
     private fun buildUi() {
+        val ink = 0xFF172033.toInt()
+        val muted = 0xFF65718A.toInt()
+        val accent = 0xFF6558F5.toInt()
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(28, 36, 28, 24)
-            setBackgroundColor(0xFFFFF8F0.toInt())
+            setPadding(0, 0, 0, 0)
+            setBackgroundColor(0xFFF4F6FC.toInt())
         }
-        val scroll = ScrollView(this)
-        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        val title = TextView(this).apply {
-            text = "Your Voice AI Agent"; textSize = 28f; gravity = Gravity.CENTER
-            setTextColor(0xFF171411.toInt())
+        val scroll = ScrollView(this).apply { clipToPadding = false }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(20, 22, 20, 28)
         }
-        status = TextView(this).apply {
-            text = "Ready · Import a compatible local model to enable AI replies"; textSize = 15f
-            gravity = Gravity.CENTER; setPadding(0, 14, 0, 20)
-        }
-        val modelButton = Button(this).apply {
-            text = "📦 Import local AI model (.task)"
-            setOnClickListener {
-                val picker = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-                    addCategory(Intent.CATEGORY_OPENABLE)
-                    type = "*/*"
-                }
-                try { startActivityForResult(picker, requestModel) }
-                catch (_: Exception) { status.text = "Could not open the system file picker." }
+
+        fun rounded(color: Int, radius: Float = 22f): android.graphics.drawable.GradientDrawable =
+            android.graphics.drawable.GradientDrawable().apply {
+                setColor(color)
+                cornerRadius = radius
             }
+
+        fun sectionTitle(value: String) = TextView(this).apply {
+            text = value
+            textSize = 13f
+            letterSpacing = 0.08f
+            setTextColor(muted)
+            setPadding(2, 20, 2, 10)
+            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
         }
-        val unloadButton = Button(this).apply {
-            text = "Unload local model"
-            setOnClickListener {
+
+        fun actionButton(value: String, filled: Boolean = false, click: () -> Unit) = Button(this).apply {
+            text = value
+            isAllCaps = false
+            textSize = 14f
+            minHeight = 52
+            setPadding(14, 8, 14, 8)
+            setTextColor(if (filled) 0xFFFFFFFF.toInt() else ink)
+            background = rounded(if (filled) accent else 0xFFFFFFFF.toInt(), 17f)
+            elevation = if (filled) 3f else 0f
+            setOnClickListener { click() }
+        }
+
+        fun addActionRow(vararg buttons: Button) {
+            val row = LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            buttons.forEachIndexed { index, button ->
+                val params = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                if (index > 0) params.leftMargin = 8
+                row.addView(button, params)
+            }
+            content.addView(row, matchWrap())
+        }
+
+        val brandRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val logo = TextView(this).apply {
+            text = "M"
+            textSize = 25f
+            gravity = Gravity.CENTER
+            setTextColor(0xFFFFFFFF.toInt())
+            typeface = android.graphics.Typeface.create("sans-serif-black", android.graphics.Typeface.NORMAL)
+            background = rounded(accent, 18f)
+        }
+        brandRow.addView(logo, LinearLayout.LayoutParams(54, 54))
+        val brandText = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(12, 0, 0, 0)
+        }
+        brandText.addView(TextView(this).apply {
+            text = "Maya"
+            textSize = 27f
+            setTextColor(ink)
+            typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
+        })
+        brandText.addView(TextView(this).apply {
+            text = "YOUR PRIVATE VOICE COMPANION"
+            textSize = 10f
+            letterSpacing = 0.08f
+            setTextColor(muted)
+        })
+        brandRow.addView(brandText, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        val privacy = TextView(this).apply {
+            text = "● LOCAL"
+            textSize = 10f
+            setTextColor(0xFF147D61.toInt())
+            setPadding(10, 8, 10, 8)
+            background = rounded(0xFFE0F6EE.toInt(), 50f)
+        }
+        brandRow.addView(privacy)
+        content.addView(brandRow, matchWrap())
+
+        val hero = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(22, 24, 22, 22)
+            background = android.graphics.drawable.GradientDrawable(
+                android.graphics.drawable.GradientDrawable.Orientation.TL_BR,
+                intArrayOf(0xFF665CF6.toInt(), 0xFF8B5CF6.toInt(), 0xFFB05BDB.toInt())
+            ).apply { cornerRadius = 28f }
+            elevation = 4f
+        }
+        hero.addView(TextView(this).apply {
+            text = "YOUR AI, YOUR DEVICE"
+            textSize = 11f
+            letterSpacing = 0.12f
+            setTextColor(0xFFE9E7FF.toInt())
+        })
+        hero.addView(TextView(this).apply {
+            text = "Hey, I’m Maya ✨"
+            textSize = 29f
+            setTextColor(0xFFFFFFFF.toInt())
+            typeface = android.graphics.Typeface.create("sans-serif", android.graphics.Typeface.BOLD)
+            setPadding(0, 8, 0, 2)
+        })
+        hero.addView(TextView(this).apply {
+            text = "Talk naturally, ask questions, or let me help with tasks on your phone."
+            textSize = 14f
+            setTextColor(0xFFF4F0FF.toInt())
+            setPadding(0, 0, 0, 16)
+        })
+        hero.addView(actionButton("🎙  Talk to Maya", true) { beginListening() })
+        val heroParams = matchWrap().apply { topMargin = 20; bottomMargin = 8 }
+        content.addView(hero, heroParams)
+
+        status = TextView(this).apply {
+            text = "Ready · Import a compatible local model to enable AI replies"
+            textSize = 13f
+            setTextColor(muted)
+            setPadding(4, 10, 4, 4)
+        }
+        content.addView(status, matchWrap())
+
+        content.addView(sectionTitle("AI MODEL"))
+        val modelCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(16, 16, 16, 16)
+            background = rounded(0xFFFFFFFF.toInt(), 22f)
+        }
+        modelCard.addView(TextView(this).apply {
+            text = "🧠  On-device language model"
+            textSize = 16f
+            setTextColor(ink)
+            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+        })
+        modelCard.addView(TextView(this).apply {
+            text = "Import a MediaPipe-compatible .task file. Model data stays on this device."
+            textSize = 12f
+            setTextColor(muted)
+            setPadding(0, 6, 0, 14)
+        })
+        val import = actionButton("Import local model (.task)", true) {
+            val picker = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "*/*"
+            }
+            try { startActivityForResult(picker, requestModel) }
+            catch (_: Exception) { status.text = "Could not open the system file picker." }
+        }
+        modelCard.addView(import, matchWrap())
+        addActionRow(
+            actionButton("Unload model") {
                 Thread {
                     val unloaded = synchronized(modelLock) {
                         modelRequestGeneration += 1L
@@ -151,52 +285,50 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                         answer.text = "Local model unloaded. Basic commands remain available."
                     }
                 }.start()
-            }
-        }
-        val clearChatButton = Button(this).apply {
-            text = "Clear local chat history"
-            setOnClickListener {
-                chatEpoch += 1L
-                chatHistory.clear()
-                status.text = "Local conversation history cleared"
-                answer.text = "Previous AI conversation context has been deleted from this phone."
-            }
-        }
-        val viewChatButton = Button(this).apply {
-            text = "View local chat history"
-            setOnClickListener {
+            },
+            actionButton("Chat history") {
                 val turns = chatHistory.load()
-                if (turns.isEmpty()) {
-                    answer.text = "No saved AI conversation turns yet."
-                    status.text = "Local chat history is empty"
-                } else {
-                    answer.text = turns.joinToString("\n\n") { turn ->
-                        "You: ${turn.user}\nMaya: ${turn.assistant}"
-                    }
-                    status.text = "Showing ${turns.size} saved conversation turns · stored on this phone"
-                }
+                answer.text = if (turns.isEmpty()) "No saved AI conversation turns yet."
+                else turns.joinToString("\n\n") { turn -> "You: ${turn.user}\nMaya: ${turn.assistant}" }
+                status.text = if (turns.isEmpty()) "Local conversation history is empty" else "Showing ${turns.size} saved turns"
             }
+        )
+        content.addView(modelCard, matchWrap())
+
+        content.addView(sectionTitle("SCREEN AUTOMATION"))
+        val accessCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(16, 16, 16, 16)
+            background = rounded(0xFFFFFFFF.toInt(), 22f)
         }
-        val accessibilityButton = Button(this).apply {
-            text = "Enable screen control (Accessibility)"
-            setOnClickListener {
-                try {
-                    startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                    status.text = "Enable Offline Voice Agent screen control in Accessibility settings, then return here."
-                } catch (_: Exception) { status.text = "Could not open Accessibility settings." }
-            }
-        }
-        val readScreenButton = Button(this).apply {
-            text = "Read current screen"
-            setOnClickListener { showScreenSnapshot() }
-        }
-        val mic = Button(this).apply {
-            text = "🎙  Tap to speak"; textSize = 18f
-            setOnClickListener { beginListening() }
-        }
-        val wakeButton = Button(this).apply {
-            text = "Enable Hey Maya wake mode"
-            setOnClickListener {
+        accessCard.addView(TextView(this).apply {
+            text = "📲  Phone control"
+            textSize = 16f
+            setTextColor(ink)
+            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+        })
+        accessCard.addView(TextView(this).apply {
+            text = "Read visible text, tap a labelled control, scroll, and enter text. Android Accessibility access must be enabled by you."
+            textSize = 12f
+            setTextColor(muted)
+            setPadding(0, 6, 0, 12)
+        })
+        accessCard.addView(actionButton("Enable screen control", true) {
+            try {
+                startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                status.text = "Enable Offline Voice Agent in Accessibility settings, then return here."
+            } catch (_: Exception) { status.text = "Could not open Accessibility settings." }
+        }, matchWrap())
+        accessCard.addView(actionButton("Read current screen") { showScreenSnapshot() }, matchWrap())
+        addActionRow(
+            actionButton("Scroll up") { handleCommand("scroll up") },
+            actionButton("Scroll down") { handleCommand("scroll down") }
+        )
+        content.addView(accessCard, matchWrap())
+
+        content.addView(sectionTitle("WAKE MODE"))
+        addActionRow(
+            actionButton("Hey Maya · in app") {
                 if (wakeModeEnabled) {
                     wakeModeEnabled = false
                     awaitingWakeCommand = false
@@ -204,68 +336,102 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     wakeHandler.removeCallbacksAndMessages(null)
                     try { speechRecognizer?.cancel() } catch (_: Exception) {}
                     recognitionInProgress = false
-                    text = "Enable Hey Maya wake mode"
-                    status.text = "Wake mode stopped · microphone is not listening"
+                    wakeModeButton?.text = "Enable Hey Maya wake mode"
+                    status.text = "Wake mode stopped"
                 } else {
                     wakeModeEnabled = true
                     awaitingWakeCommand = false
                     wakeRetryCount = 0
-                    text = "Stop Hey Maya wake mode"
+                    wakeModeButton?.text = "Stop Hey Maya wake mode"
                     status.text = "Starting wake mode… say Hey Maya"
                     beginListening()
                 }
-            }
+            },
+            actionButton("Background wake") { requestAndStartBackgroundWake() }
+        )
+        wakeModeButton = null
+        val backgroundStop = actionButton("Stop background listening") {
+            stopService(Intent(this, BackgroundWakeService::class.java))
+            status.text = "Background wake service stopped"
         }
-        wakeModeButton = wakeButton
-        val backgroundWakeButton = Button(this).apply {
-            text = "Start background Hey Maya"
-            setOnClickListener { requestAndStartBackgroundWake() }
+        content.addView(backgroundStop, matchWrap())
+
+        content.addView(sectionTitle("CONVERSATION"))
+        val conversationCard = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(16, 16, 16, 16)
+            background = rounded(0xFFFFFFFF.toInt(), 22f)
         }
-        val stopBackgroundWakeButton = Button(this).apply {
-            text = "Stop background wake service"
-            setOnClickListener {
-                stopService(Intent(this@MainActivity, BackgroundWakeService::class.java))
-                status.text = "Background wake service stopped"
-            }
-        }
+        conversationCard.addView(label("YOU SAID"))
         transcript = TextView(this).apply {
-            text = "Your speech will appear here."; textSize = 18f
-            setPadding(16, 18, 16, 18); setBackgroundColor(0xFFFFE9DC.toInt())
+            text = "Your speech will appear here."
+            textSize = 16f
+            setTextColor(ink)
+            setPadding(14, 14, 14, 14)
+            background = rounded(0xFFF1F3FA.toInt(), 16f)
         }
+        conversationCard.addView(transcript, matchWrap())
+        conversationCard.addView(label("MAYA REPLIED"))
         answer = TextView(this).apply {
-            text = "Try: time, date, open settings, or ask a question after importing a compatible MediaPipe .task model."
-            textSize = 17f; setTextColor(0xFF4B4038.toInt()); setPadding(16, 18, 16, 18)
+            text = "Try: time, date, search YouTube for science facts, read screen, or ask a question after importing a compatible local model."
+            textSize = 16f
+            setTextColor(ink)
+            setPadding(14, 14, 14, 14)
+            background = rounded(0xFFF7F5FF.toInt(), 16f)
         }
-        val input = EditText(this).apply { hint = "Ask or type a command…"; textSize = 16f }
-        val run = Button(this).apply {
-            text = "Run command"
-            setOnClickListener {
-                val value = input.text.toString().trim()
-                if (value.isNotEmpty()) { transcript.text = value; handleCommand(value) }
+        conversationCard.addView(answer, matchWrap())
+        val input = EditText(this).apply {
+            hint = "Message Maya…"
+            textSize = 15f
+            setSingleLine(false)
+            minLines = 1
+            maxLines = 4
+            setPadding(14, 10, 14, 10)
+            background = rounded(0xFFF1F3FA.toInt(), 16f)
+        }
+        conversationCard.addView(input, matchWrap())
+        conversationCard.addView(actionButton("Send message  ➜", true) {
+            val value = input.text.toString().trim()
+            if (value.isNotEmpty()) {
+                transcript.text = value
+                handleCommand(value)
+                input.setText("")
             }
-        }
-        listOf(title, status, modelButton, unloadButton, viewChatButton, clearChatButton, accessibilityButton, readScreenButton, mic, wakeButton, backgroundWakeButton, stopBackgroundWakeButton, label("YOU SAID"), transcript,
-            label("ASSISTANT"), answer, input, run,
-            label("Model files stay on this phone. Use a MediaPipe LLM Inference compatible .task model; ordinary GGUF files are not supported by this runtime."),
-            label("Offline speech depends on your installed Android speech service and language pack.")).forEach {
-            content.addView(it, matchWrap())
-        }
+        }, matchWrap())
+        addActionRow(
+            actionButton("Clear chat") {
+                chatEpoch += 1L
+                chatHistory.clear()
+                status.text = "Local conversation history cleared"
+                answer.text = "Previous AI conversation context has been deleted from this phone."
+            },
+            actionButton("View saved chat") {
+                val turns = chatHistory.load()
+                answer.text = if (turns.isEmpty()) "No saved AI conversation turns yet."
+                else turns.joinToString("\n\n") { turn -> "You: ${turn.user}\nMaya: ${turn.assistant}" }
+            }
+        )
+        content.addView(conversationCard, matchWrap())
+
+        content.addView(sectionTitle("QUICK ACTIONS"))
+        addActionRow(
+            actionButton("YouTube") { handleCommand("open youtube") },
+            actionButton("Contacts") { handleCommand("open contacts") }
+        )
+        addActionRow(
+            actionButton("Browser search") { handleCommand("search web for ") },
+            actionButton("Phone settings") { handleCommand("open settings") }
+        )
+        content.addView(TextView(this).apply {
+            text = "Privacy first · Screen reading and interaction run on-device. AI replies require a compatible imported model. Speech recognition and TTS depend on your installed Android language services."
+            textSize = 11f
+            setTextColor(muted)
+            setPadding(4, 18, 4, 8)
+        }, matchWrap())
+
         scroll.addView(content)
         root.addView(scroll, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         setContentView(root)
-    }
-
-    private fun screenAction(action: (android.view.accessibility.AccessibilityNodeInfo) -> Boolean): String? {
-        val ok = AgentAccessibilityService.performOnActiveRoot(action) ?: return null
-        return if (ok) "Screen action performed." else "No suitable scrollable screen control was found."
-    }
-
-    private fun showScreenSnapshot(): String {
-        val snapshot = AgentAccessibilityService.readActiveScreen()
-        val message = snapshot ?: "Screen control is not enabled. Tap Enable screen control, enable the service in Android Accessibility settings, then try again."
-        answer.text = message
-        status.text = if (snapshot == null) "Accessibility service unavailable" else "Current screen read locally"
-        return message
     }
 
     private fun label(value: String) = TextView(this).apply {
