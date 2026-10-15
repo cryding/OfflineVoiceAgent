@@ -45,6 +45,8 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private val requestAudio = 41
     private val requestFile = 42
     private val requestModel = 43
+    private val MAX_MODEL_BYTES = 6L * 1024L * 1024L * 1024L
+    private val MIN_FREE_SPACE_AFTER_IMPORT = 256L * 1024L * 1024L
     private val prefs by lazy { getSharedPreferences("offline_agent_model", MODE_PRIVATE) }
     private val chatHistory by lazy { ChatHistoryStore(getSharedPreferences("offline_agent_chat", MODE_PRIVATE)) }
 
@@ -275,10 +277,21 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     throw IllegalArgumentException("Choose a MediaPipe-compatible .task model. GGUF is not supported by this runtime.")
                 }
                 val modelDir = File(filesDir, "models").apply { mkdirs() }
+                val reportedSize = queryFileSize(uri)
+                if (reportedSize != null && reportedSize > MAX_MODEL_BYTES) {
+                    throw IllegalArgumentException("Model is larger than the 6 GiB import safety limit.")
+                }
+                val requiredSpace = (reportedSize ?: 0L) + MIN_FREE_SPACE_AFTER_IMPORT
+                if (modelDir.usableSpace < requiredSpace) {
+                    throw IllegalArgumentException("Not enough free storage for this model and a safety margin.")
+                }
                 copied = File(modelDir, "assistant-model-${System.currentTimeMillis()}.task")
                 contentResolver.openInputStream(uri).use { input ->
                     requireNotNull(input) { "Could not read the selected file." }
                     FileOutputStream(copied).use { output -> input.copyTo(output) }
+                }
+                if (copied.length() == 0L || copied.length() > MAX_MODEL_BYTES) {
+                    throw IllegalArgumentException("The selected model is empty or exceeds the 6 GiB safety limit.")
                 }
                 runOnUiThread { status.text = "Model copied. Initializing on-device inference…" }
                 initializeModel(copied.absolutePath)
@@ -294,6 +307,14 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             if (cursor.moveToFirst()) return cursor.getString(0)
         }
         return null
+    }
+
+    private fun queryFileSize(uri: Uri): Long? {
+        return try {
+            contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst() && !cursor.isNull(0)) cursor.getLong(0).takeIf { it >= 0L } else null
+            }
+        } catch (_: Exception) { null }
     }
 
     private fun loadModel(path: String) {
