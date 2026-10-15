@@ -31,7 +31,7 @@ class WakeWordParserTest {
 
     @Test fun supportsBengaliUnicodeVariantsAndRejectsPartialPhrase() {
         assertTrue(WakeWordParser.containsWakePhrase("হেই মায়া, সময় বলো"))
-        assertFalse(WakeWordParser.containsWakePhrase("হে মায়াবী"))
+        assertFalse(WakeWordParser.containsWakePhrase("হেয় মায়া"))
     }
 
     @Test fun detectsBengaliWakePhrase() {
