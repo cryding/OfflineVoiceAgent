@@ -327,29 +327,27 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
         content.addView(accessCard, matchWrap())
 
         content.addView(sectionTitle("WAKE MODE"))
-        addActionRow(
-            actionButton("Hey Maya · in app") {
-                if (wakeModeEnabled) {
-                    wakeModeEnabled = false
-                    awaitingWakeCommand = false
-                    wakeRetryCount = 0
-                    wakeHandler.removeCallbacksAndMessages(null)
-                    try { speechRecognizer?.cancel() } catch (_: Exception) {}
-                    recognitionInProgress = false
-                    wakeModeButton?.text = "Enable Hey Maya wake mode"
-                    status.text = "Wake mode stopped"
-                } else {
-                    wakeModeEnabled = true
-                    awaitingWakeCommand = false
-                    wakeRetryCount = 0
-                    wakeModeButton?.text = "Stop Hey Maya wake mode"
-                    status.text = "Starting wake mode… say Hey Maya"
-                    beginListening()
-                }
-            },
-            actionButton("Background wake") { requestAndStartBackgroundWake() }
-        )
-        wakeModeButton = null
+        val wakeToggle = actionButton("Enable Hey Maya wake mode") {
+            if (wakeModeEnabled) {
+                wakeModeEnabled = false
+                awaitingWakeCommand = false
+                wakeRetryCount = 0
+                wakeHandler.removeCallbacksAndMessages(null)
+                try { speechRecognizer?.cancel() } catch (_: Exception) {}
+                recognitionInProgress = false
+                wakeModeButton?.text = "Enable Hey Maya wake mode"
+                status.text = "Wake mode stopped"
+            } else {
+                wakeModeEnabled = true
+                awaitingWakeCommand = false
+                wakeRetryCount = 0
+                wakeModeButton?.text = "Stop Hey Maya wake mode"
+                status.text = "Starting wake mode… say Hey Maya"
+                beginListening()
+            }
+        }
+        wakeModeButton = wakeToggle
+        addActionRow(wakeToggle, actionButton("Background wake") { requestAndStartBackgroundWake() })
         val backgroundStop = actionButton("Stop background listening") {
             stopService(Intent(this, BackgroundWakeService::class.java))
             status.text = "Background wake service stopped"
