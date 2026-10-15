@@ -124,17 +124,18 @@ class AgentAccessibilityService : AccessibilityService() {
         fun pressEnter(): Boolean? {
             val service = instance ?: return null
             val root = service.rootInActiveWindow ?: return false
-            fun find(node: AccessibilityNodeInfo?, depth: Int): AccessibilityNodeInfo? {
+            fun findAction(node: AccessibilityNodeInfo?, depth: Int): AccessibilityNodeInfo? {
                 if (node == null || depth > 12) return null
-                if (node.isEditable && node.isFocused) return node
+                val label = (node.text?.toString().orEmpty() + " " + node.contentDescription?.toString().orEmpty()).lowercase(Locale.ROOT)
+                if (node.isClickable && node.isEnabled && listOf("search", "enter", "go", "done", "submit", "সার্চ", "খুঁজ").any { label.contains(it) }) return node
                 for (i in 0 until node.childCount) {
-                    val found = find(node.getChild(i), depth + 1)
+                    val found = findAction(node.getChild(i), depth + 1)
                     if (found != null) return found
                 }
                 return null
             }
-            val field = find(root, 0) ?: return false
-            return try { field.performAction(AccessibilityNodeInfo.ACTION_IME_ENTER) } catch (_: Exception) { false }
+            val action = findAction(root, 0) ?: return false
+            return try { action.performAction(AccessibilityNodeInfo.ACTION_CLICK) } catch (_: Exception) { false }
         }
 
         fun typeText(value: String): String? {
