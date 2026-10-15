@@ -24,6 +24,16 @@ class WakeWordParserTest {
         assertFalse(WakeWordParser.containsWakePhrase("they maya said hello"))
     }
 
+    @Test fun normalizesDisplayTextWithoutChangingOriginalCommandParsing() {
+        assertEquals("hey maya, hello", WakeWordParser.normalizeForDisplay("  Hey Maya, Hello  "))
+        assertEquals("open settings", WakeWordParser.commandAfterWake("HEY MAYA! open settings"))
+    }
+
+    @Test fun supportsBengaliUnicodeVariantsAndRejectsPartialPhrase() {
+        assertTrue(WakeWordParser.containsWakePhrase("হেই মায়া, সময় বলো"))
+        assertFalse(WakeWordParser.containsWakePhrase("হে মায়াবী"))
+    }
+
     @Test fun detectsBengaliWakePhrase() {
         assertTrue(WakeWordParser.containsWakePhrase("\u09b9\u09c7\u0987 \u09ae\u09be\u09af\u09bc\u09be"))
     }
