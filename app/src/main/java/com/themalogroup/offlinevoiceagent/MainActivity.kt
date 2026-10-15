@@ -46,6 +46,13 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     private val wakeHandler = Handler(Looper.getMainLooper())
     @Volatile private var llmEngine: LocalLlmEngine? = null
     private val modelLock = Any()
+    private var modelRequestGeneration = 0L
+    @Volatile private var activityDestroyed = false
+
+    private fun beginModelRequest(): Long = synchronized(modelLock) {
+        modelRequestGeneration += 1L
+        modelRequestGeneration
+    }
     private val requestAudio = 41
     private val requestFile = 42
     private val requestModel = 43
@@ -129,6 +136,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             setOnClickListener {
                 Thread {
                     val unloaded = synchronized(modelLock) {
+                        modelRequestGeneration += 1L
                         val previous = llmEngine
                         llmEngine = null
                         try { previous?.close() } catch (_: Exception) {}
@@ -303,6 +311,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
 
     private fun importModel(uri: Uri) {
+        val generation = beginModelRequest()
         status.text = "Copying model into app-private storage…"
         Thread {
             var copied: File? = null
@@ -329,7 +338,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                     throw IllegalArgumentException("The selected model is empty or exceeds the 6 GiB safety limit.")
                 }
                 runOnUiThread { status.text = "Model copied. Initializing on-device inference…" }
-                initializeModel(copied.absolutePath)
+                initializeModel(copied.absolutePath, generation)
             } catch (e: Exception) {
                 copied?.delete()
                 runOnUiThread { status.text = "Model import failed: ${e.localizedMessage ?: "unsupported model"}" }
@@ -353,32 +362,54 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
 
     private fun loadModel(path: String) {
+        val generation = beginModelRequest()
         status.text = "Loading saved local model…"
-        Thread { initializeModel(path) }.start()
+        Thread { initializeModel(path, generation) }.start()
     }
 
-    private fun initializeModel(path: String) {
+    private fun initializeModel(path: String, generation: Long) {
+        var candidate: LocalLlmEngine? = null
         try {
-            val next = LocalLlmEngine(this, path)
+            candidate = LocalLlmEngine(this, path)
             val oldPath = prefs.getString("model_path", null)
-            synchronized(modelLock) {
-                val old = llmEngine
-                llmEngine = next
-                try { old?.close() } catch (_: Exception) {}
+            val accepted = synchronized(modelLock) {
+                if (activityDestroyed || generation != modelRequestGeneration) {
+                    false
+                } else {
+                    val old = llmEngine
+                    llmEngine = candidate
+                    try { old?.close() } catch (_: Exception) {}
+                    prefs.edit().putString("model_path", path).apply()
+                    true
+                }
             }
-            prefs.edit().putString("model_path", path).apply()
+            if (!accepted) {
+                try { candidate.close() } catch (_: Exception) {}
+                if (prefs.getString("model_path", null) != path) File(path).delete()
+                return
+            }
             if (oldPath != null && oldPath != path) File(oldPath).delete()
             runOnUiThread {
-                status.text = "Local LLM loaded · inference runs on this device"
-                answer.text = "AI model loaded. Ask a question or give a command."
+                if (!activityDestroyed && generation == synchronized(modelLock) { modelRequestGeneration }) {
+                    status.text = "Local LLM loaded · inference runs on this device"
+                    answer.text = "AI model loaded. Ask a question or give a command."
+                }
             }
         } catch (e: Exception) {
-            if (prefs.getString("model_path", null) == path) {
-                prefs.edit().remove("model_path").apply()
+            try { candidate?.close() } catch (_: Exception) {}
+            val stillCurrent = synchronized(modelLock) {
+                !activityDestroyed && generation == modelRequestGeneration
             }
-            File(path).delete()
-            runOnUiThread {
-                status.text = "Could not load this model. It may be incompatible or too large: ${e.localizedMessage ?: "initialization error"}"
+            if (stillCurrent) {
+                if (prefs.getString("model_path", null) == path) {
+                    prefs.edit().remove("model_path").apply()
+                }
+                File(path).delete()
+                runOnUiThread {
+                    if (!activityDestroyed && generation == synchronized(modelLock) { modelRequestGeneration }) {
+                        status.text = "Could not load this model. It may be incompatible or too large: ${e.localizedMessage ?: "initialization error"}"
+                    }
+                }
             }
         }
     }
@@ -559,11 +590,13 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
     }
 
     override fun onDestroy() {
+        activityDestroyed = true
         wakeHandler.removeCallbacksAndMessages(null)
         speechRecognizer?.destroy()
         tts?.stop()
         tts?.shutdown()
         synchronized(modelLock) {
+            modelRequestGeneration += 1L
             val engine = llmEngine
             llmEngine = null
             try { engine?.close() } catch (_: Exception) {}
