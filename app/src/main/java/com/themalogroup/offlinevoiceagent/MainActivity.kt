@@ -706,6 +706,19 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
             }
         }
         val response = when (command) {
+            AssistantCommand.TAP_AT -> {
+                val match = Regex("""tap at\\s+(\\d+)\\s*,\\s*(\\d+)""", RegexOption.IGNORE_CASE).find(raw)
+                val ok = match?.let { AgentAccessibilityService.tapAt(it.groupValues[1].toInt(), it.groupValues[2].toInt()) }
+                if (ok == true) "Tap gesture sent to the requested screen coordinates." else "Screen control is disabled or the coordinates are invalid."
+            }
+            AssistantCommand.SWIPE -> {
+                val match = Regex("""swipe from\\s+(\\d+)\\s*,\\s*(\\d+)\\s+to\\s+(\\d+)\\s*,\\s*(\\d+)""", RegexOption.IGNORE_CASE).find(raw)
+                val ok = match?.let { AgentAccessibilityService.swipe(it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt(), it.groupValues[4].toInt()) }
+                if (ok == true) "Swipe gesture sent." else "Screen control is disabled or the coordinates are invalid."
+            }
+            AssistantCommand.PRESS_BACK -> if (AgentAccessibilityService.globalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK) == true) "Went back." else "Screen control is not enabled."
+            AssistantCommand.PRESS_HOME -> if (AgentAccessibilityService.globalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME) == true) "Went to the home screen." else "Screen control is not enabled."
+            AssistantCommand.PRESS_ENTER -> if (AgentAccessibilityService.pressEnter() == true) "Submitted the focused field." else "No focused text field could submit."
             AssistantCommand.ACCESSIBILITY_SETTINGS -> launchTool(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS), "Opening Accessibility settings. Enable Offline Voice Agent screen control there.")
             AssistantCommand.READ_SCREEN -> showScreenSnapshot()
             AssistantCommand.SCROLL_DOWN -> (AgentAccessibilityService.scroll(true) ?: false).let { if (it) "Scrolled down." else "Screen control is not enabled or no scrollable content is visible." }
@@ -799,7 +812,7 @@ class MainActivity : Activity(), TextToSpeech.OnInitListener {
                 } else "No memory deletion is pending. Say forget all memories first if you want to delete them."
             }
             AssistantCommand.STOP_SPEAKING -> { tts?.stop(); "Speech stopped." }
-            AssistantCommand.HELP -> "I’m Maya, your offline companion. Try time/date, open camera/browser/maps/YouTube/dialer, search YouTube, read screen, tap [visible label], scroll down/up, type [text], open Accessibility settings, search web, contacts/calendar, or remember a note. Screen controls require enabling Accessibility permission."
+            AssistantCommand.HELP -> "I’m Maya, your offline companion. Try time/date, open camera/browser/maps/YouTube/dialer, search YouTube, read screen, tap [visible label], tap at x,y, swipe from x,y to x,y, scroll down/up, type [text], press enter/back/home, open Accessibility settings, search web, contacts/calendar, or remember a note. Screen controls require enabling Accessibility permission."
             AssistantCommand.UNKNOWN -> if (llmEngine == null) "I can do phone actions offline, but for open-ended conversation please import a compatible local .task AI model." else "I’m here with you. Ask me naturally, or say “help” to hear the tools I can open."
         }
         answer.text = response
