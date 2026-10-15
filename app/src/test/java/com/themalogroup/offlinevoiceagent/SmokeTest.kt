@@ -20,6 +20,23 @@ class SmokeTest {
         assertEquals(AssistantCommand.UNKNOWN, CommandRouter.route("open my settings for a poem"))
     }
 
+    @Test fun normalizesWhitespaceAndRoutesBengaliCommands() {
+        assertEquals(AssistantCommand.TIME, CommandRouter.route("  WHAT   TIME is it "))
+        assertEquals(AssistantCommand.HELLO, CommandRouter.route("নমস্কার"))
+        assertEquals(AssistantCommand.OPEN_SETTINGS, CommandRouter.route("সেটিংস খোলো"))
+        assertEquals(AssistantCommand.OPEN_CONTACTS, CommandRouter.route("কন্টাক্ট খোলো"))
+        assertEquals(AssistantCommand.OPEN_CALENDAR, CommandRouter.route("ক্যালেন্ডার খোলো"))
+        assertEquals(AssistantCommand.PICK_FILE, CommandRouter.route("ফাইল খোলো"))
+        assertEquals(AssistantCommand.STOP_SPEAKING, CommandRouter.route("চুপ করো"))
+        assertEquals(AssistantCommand.HELP, CommandRouter.route("সাহায্য"))
+    }
+
+    @Test fun memoryCommandsRequireExplicitConfirmationForDeletion() {
+        assertEquals(AssistantCommand.CLEAR_MEMORY, CommandRouter.route("forget all memories"))
+        assertEquals(AssistantCommand.CONFIRM_CLEAR, CommandRouter.route("confirm forget all"))
+        assertEquals(AssistantCommand.UNKNOWN, CommandRouter.route("please remember my memories are important"))
+    }
+
     @Test fun routesLocalMemoryCommands() {
         assertEquals(AssistantCommand.REMEMBER, CommandRouter.route("remember that I prefer Bengali"))
         assertEquals("I prefer Bengali", CommandRouter.memoryText("remember that I prefer Bengali"))
